@@ -1,0 +1,57 @@
+Tutorial: agregar objetos
+
+Hay cuatro formas, de más simple a más completa.
+
+1. Soltar un PNG en una carpeta (la más simple)
+Preparar la imagen: PNG con fondo transparente, 512 px o más, silueta sólida y trazos gruesos. Los huecos del dibujo tienen que ser transparentes.
+Crear la carpeta una sola vez: en Xcode, File → Add Files. Elegí una carpeta llamada ShopItems con tres subcarpetas: bronze, silver y gold. Marcá “Create folder references”: tiene que verse azul, no amarilla.
+Agregar el item: copiá el PNG dentro de la subcarpeta de su sección (por ejemplo ShopItems/silver/shield.png).
+Correr la app: el item aparece solo en la tienda y en la colección. El nombre sale del archivo (coin_stack.png queda “COIN STACK”), el costo es el de la sección (100, 25 o 10) y el metal es el de la carpeta donde lo pusiste.
+
+El id del item es silver.shield. Si renombrás el archivo, cambia el id y se pierde la compra guardada.
+
+2. Con ShopCatalog.json
+
+Sirve para elegir nombre, costo, descripción y recompensas. Agregá una entrada en ShopCatalog.json:
+
+json
+{
+  "id": "silver.streak_shield",
+  "category": "silver",
+  "name": "Streak Shield",
+  "description": "Protects your streak.",
+  "cost": 25,
+  "image": "ShopItems/silver/shield.png",
+  "depth": 0.30,
+  "grants": 10
+}
+category: bronze, silver o gold. Define la sección y el metal.
+Qué mostrar: usá uno solo de estos campos:
+image: un PNG o JPG. Acepta el nombre de un asset de Assets.xcassets o una ruta como ShopItems/silver/shield.png.
+model: un .usdz o .scn.
+symbol: un SF Symbol.
+shape: por ahora sólo "hexCube".
+depth: grosor, opcional. Por defecto es 0.34, que da la pieza gruesa de tu foto 2. Probá entre 0.2 y 0.5.
+id: fijalo siempre, para no perder compras.
+recolor: para .usdz, ponelo en true si querés que tome el metal de la sección.
+grants: lo que otorga el item (grantedEarnings).
+
+Agregar el JSON al target. Si el archivo no existe, se usan los items de builtIn en ShopCatalogLoader.swift.
+
+3. Con un modelo 3D tuyo
+Exportá el modelo como .usdz. Funciona con modelos hechos en Blender, Reality Composer y similares.
+Ponelo en ShopItems/<sección>/ o referencialo con "model": "nombre" en el JSON.
+El modelo se centra y se escala solo. Con "recolor": true pierde sus colores originales y usa el metal de la sección.
+4. Con un SF Symbol (sin ningún archivo)
+
+Una entrada con "symbol": "bolt.fill" ya se extruye con su propia forma. Sirve para tener items distintos mientras no tenés los PNG.
+
+Cómo agregar una sección nueva (por ejemplo platinum)
+Agregá case platinum en ShopCategory.
+Agregá su MetalStyle en MetalStyle.swift (por ejemplo static let platinum = MetalStyle(r: 0.9, g: 0.92, b: 0.95, roughness: 0.25)) y su línea en el switch de metal.
+Completá los switch de ShopCategory que ya existen (displayName, subtitle, tier). El tier necesita un CurrencyTier equivalente, que depende de tu modelo de monedas. Creá la carpeta ShopItems/platinum/.
+Si algo sale mal
+El item no aparece: casi siempre la carpeta no es una folder reference (azul). Borrala del proyecto y agregala de nuevo.
+Sale un logo hexágono-cubo en vez de tu icono: no se encontró la imagen, el nombre está mal escrito o la silueta quedó vacía. Probá con un PNG de silueta bien definida.
+Se ve poco detalle: una extrusión de silueta no reproduce los detalles internos. Para eso conviene un modelo .usdz con "recolor": true.
+El bisel se ve raro en un icono muy fino: bajá depth, o el bisel desde ExtrudedIcon.swift (línea bevel: min(0.03, ...)).
