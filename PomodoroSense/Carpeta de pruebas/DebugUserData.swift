@@ -34,9 +34,9 @@ enum DebugUserData {
     // MARK: - Wallet
 
     /// nil = no toca el valor persistido.
-    static let bronze: Int? = 1000
-    static let silver: Int? = 500
-    static let gold:   Int? = 500
+    static let bronze: Int? = 1
+    static let silver: Int? = nil
+    static let gold:   Int? = nil
 
     /// Tiers desbloqueados. nil = no toca.
     static let unlockedTiers: Set<CurrencyTier>? = nil //[.bronze, .silver, .gold]

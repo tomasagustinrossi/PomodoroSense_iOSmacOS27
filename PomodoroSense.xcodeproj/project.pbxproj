@@ -13,6 +13,7 @@
 		668E84C530757D3900C0779F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 668E84C430757D3900C0779F /* WidgetKit.framework */; };
 		668E84C730757D3900C0779F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 668E84C630757D3900C0779F /* SwiftUI.framework */; };
 		668E84D830757D3C00C0779F /* PomodoroWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 668E84C230757D3900C0779F /* PomodoroWidgetExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		66E602F83087DD1500460288 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 66E602F73087DD1500460288 /* LICENSE */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -61,6 +62,7 @@
 		668E84C430757D3900C0779F /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		668E84C630757D3900C0779F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		6691EF353079EA91002A5C65 /* PomodoroWidgetExtensionDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PomodoroWidgetExtensionDebug.entitlements; sourceTree = "<group>"; };
+		66E602F73087DD1500460288 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -276,6 +278,7 @@
 				668E84C330757D3900C0779F /* Frameworks */,
 				6654A60A307D9A6600E391C3 /* PomodoroWidgets */,
 				661B064E3072DF53000890AC /* Products */,
+				66E602F73087DD1500460288 /* LICENSE */,
 			);
 			sourceTree = "<group>";
 		};
@@ -429,6 +432,7 @@
 		661B064B3072DF53000890AC /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				66E602F83087DD1500460288 /* LICENSE in Resources */,
 			);
 		};
 		6654A5A4307D670100E391C3 /* Resources */ = {
