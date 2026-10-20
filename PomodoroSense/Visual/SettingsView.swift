@@ -349,6 +349,7 @@ struct PomodoroSettingsView: View {
                 isEditing: editingNumberField == .focus,
                 draft: $numberDraft,
                 onTapActivate: { activateZone(.focus) },
+                onCommit: { _ = commitNumberEditing() },
                 shakeSignal: focusShakeSignal
             )
             SettingRow(
@@ -361,6 +362,7 @@ struct PomodoroSettingsView: View {
                 isEditing: editingNumberField == .breakTime,
                 draft: $numberDraft,
                 onTapActivate: { activateZone(.breakTime) },
+                onCommit: { _ = commitNumberEditing() },
                 shakeSignal: breakShakeSignal
             )
             SettingRow(
@@ -373,6 +375,7 @@ struct PomodoroSettingsView: View {
                 isEditing: editingNumberField == .sessions,
                 draft: $numberDraft,
                 onTapActivate: { activateZone(.sessions) },
+                onCommit: { _ = commitNumberEditing() },
                 shakeSignal: sessionsShakeSignal
             )
         }
@@ -453,7 +456,26 @@ struct PomodoroSettingsView: View {
     }
 
     private func activateZone(_ zone: TimerSetupZone) {
+        #if os(iOS)
+        // Si veníamos editando otro campo numérico, commitearlo antes de
+        // cambiar de zona. En macOS el commit lo maneja el key monitor.
+        if editingNumberField != nil, numberField(for: zone) != editingNumberField {
+            _ = commitNumberEditing()
+        }
+        #endif
+
         activeZone = zone
+
+        #if os(iOS)
+        if let field = numberField(for: zone), editingNumberField != field {
+            // Bajar foco del nombre y abrir el campo numérico con el
+            // teclado. Draft vacío para que el placeholder muestre
+            // el valor actual sin tener que borrarlo a mano.
+            isNameFocused = false
+            numberDraft = ""
+            editingNumberField = field
+        }
+        #endif
     }
 
     private func currentConfigSnapshot() -> PomodoroConfigDTO {
@@ -474,6 +496,14 @@ struct PomodoroSettingsView: View {
     // MARK: - Edición
 
     private func dismissKeyboard() {
+        #if os(iOS)
+        // Tap fuera del campo = "terminé de escribir" → commitear.
+        // En macOS, Escape cancela y Enter commitea; el tap fuera
+        // nunca edita un número (no hay keyboard monitor activo).
+        if editingNumberField != nil {
+            _ = commitNumberEditing()
+        }
+        #endif
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             isNameFocused = false
             editingNumberField = nil
@@ -908,7 +938,10 @@ struct SettingRow: View {
     var isEditing: Bool
     @Binding var draft: String
     var onTapActivate: () -> Void
+    var onCommit: () -> Void = {}
     var shakeSignal: Int = 0
+
+    @FocusState private var isFieldFocused: Bool
 
     // MARK: - Estilos dinámicos (Mac se mantiene, iOS se achica)
     private var titleFontSize: CGFloat {
@@ -1008,6 +1041,9 @@ struct SettingRow: View {
         .onTapGesture {
             onTapActivate()
         }
+        .onChange(of: isEditing) { _, editing in
+            if !editing { isFieldFocused = false }
+        }
     }
 
     private var displayText: String {
@@ -1015,7 +1051,60 @@ struct SettingRow: View {
         return "\(value)"
     }
 
+    @ViewBuilder
     private var valueDisplay: some View {
+        #if os(iOS)
+        if isEditing {
+            iosEditingField
+        } else {
+            displayButton
+        }
+        #else
+        displayButton
+        #endif
+    }
+
+    #if os(iOS)
+    @ViewBuilder
+    private var iosEditingField: some View {
+        TextField("\(value)", text: $draft)
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.center)
+            .font(.system(size: valueFontSize, weight: .light, design: .default))
+            .monospacedDigit()
+            .foregroundColor(accentColor)
+            .tint(accentColor)
+            .frame(width: valueFrameWidth, height: valueFrameHeight)
+            .focused($isFieldFocused)
+            .onAppear {
+                // Delay corto: asegura que el TextField esté en el
+                // view tree antes de pedir foco (si no, iOS no abre
+                // el teclado).
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    isFieldFocused = true
+                }
+            }
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        isFieldFocused = false
+                        onCommit()
+                    }
+                    .foregroundColor(accentColor)
+                    .fontWeight(.semibold)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(accentColor)
+                    .frame(height: 1)
+                    .offset(y: 6)
+            }
+    }
+    #endif
+
+    private var displayButton: some View {
         Button(action: onTapActivate) {
             Text(displayText)
                 .font(.system(size: valueFontSize, weight: .light, design: .default))

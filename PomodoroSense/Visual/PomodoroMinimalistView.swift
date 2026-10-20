@@ -222,6 +222,15 @@ struct PomodoroMinimalistView: View {
 struct MainTimerScreen: View {
     @State private var showEqualizer: Bool = false
 
+    /// `true` si hay cualquier popup/tooltip encima del timer.
+    /// Se usa para desactivar gestos, teclado y scroll del fondo.
+    private var isAnyPopupOpen: Bool {
+        showEqualizer
+            || timerVM.sessionReward != nil
+            || timerVM.sessionSummary != nil
+            || timerVM.tierUnlock != nil
+    }
+
     #if os(macOS)
     /// Monitor local para interceptar Return de forma confiable.
     /// Los `.keyboardShortcut(.return)` en botones ocultos no se registran
@@ -325,7 +334,7 @@ struct MainTimerScreen: View {
         ZStack {
             Group {
                 Button("") {
-                    onNavigate?(.savedPresets)
+                    if !isAnyPopupOpen { onNavigate?(.savedPresets) }
                 }
                 .keyboardShortcut(.cancelAction)
             }
@@ -337,10 +346,10 @@ struct MainTimerScreen: View {
             // Space, Return y P → toggle (play/pause).
             // ↑ / ↓ → volver a SavedPresets (comportamiento existente, sin tocar).
             Group {
-                Button("") { timerVM.userToggleTimer() }.keyboardShortcut(.space, modifiers: [])
-                Button("") { timerVM.userToggleTimer() }.keyboardShortcut(KeyEquivalent("p"), modifiers: [])
-                Button("") { onNavigate?(.savedPresets) }.keyboardShortcut(.downArrow, modifiers: [])
-                Button("") { onNavigate?(.savedPresets) }.keyboardShortcut(.upArrow, modifiers: [])
+                Button("") { if !isAnyPopupOpen { timerVM.userToggleTimer() } }.keyboardShortcut(.space, modifiers: [])
+                Button("") { if !isAnyPopupOpen { timerVM.userToggleTimer() } }.keyboardShortcut(KeyEquivalent("p"), modifiers: [])
+                Button("") { if !isAnyPopupOpen { onNavigate?(.savedPresets) } }.keyboardShortcut(.downArrow, modifiers: [])
+                Button("") { if !isAnyPopupOpen { onNavigate?(.savedPresets) } }.keyboardShortcut(.upArrow, modifiers: [])
             }
             .opacity(0)
             .frame(width: 0, height: 0)
@@ -380,6 +389,7 @@ struct MainTimerScreen: View {
 
                 HStack(spacing: isPortrait ? 5 : 20) {
                     Button(action: {
+                        guard !isAnyPopupOpen else { return }
                         Haptics.selection()
                         if timerVM.isMirror {
                             timerVM.userSkipPrevious()
@@ -409,12 +419,11 @@ struct MainTimerScreen: View {
                     .animation(HIGMotion.state, value: timerVM.isRunning)
 
                     Button(action: {
+                        guard !isAnyPopupOpen else { return }
                         Haptics.selection()
                         if timerVM.isMirror {
                             timerVM.userSkipNext()
                         } else {
-                            // Skip explícito → sin chips. El reset de la navegación lo maneja
-                            // el flag `wantsToNavigateToSavedPresets` cuando termina el preset.
                             _ = timerVM.skipToNextPhase(wasCompleted: false)
                         }
                     }) {
@@ -477,13 +486,14 @@ struct MainTimerScreen: View {
             }
         }
         .scrollWheelBack {
-            onNavigate?(.savedPresets)
+            if !isAnyPopupOpen { onNavigate?(.savedPresets) }
         }
         #endif
         .contentShape(Rectangle())
         .gesture(
             DragGesture()
                 .onEnded { value in
+                    guard !isAnyPopupOpen else { return }
                     let translation = value.translation
                     #if os(macOS)
                     if translation.height < -50 || translation.height > 50 { onNavigate?(.savedPresets) }
@@ -493,6 +503,7 @@ struct MainTimerScreen: View {
                 }
         )
         .onTapGesture {
+            guard !isAnyPopupOpen else { return }
             timerVM.userToggleTimer()
         }
         // HIG: la respuesta háptica sigue al CAMBIO DE ESTADO, no al gesto. Así también vibra

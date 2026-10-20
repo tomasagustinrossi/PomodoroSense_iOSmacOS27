@@ -9,6 +9,11 @@ struct FreeModeView: View {
     @State private var showEqualizer = false
     @State private var noteSession: FreeModeSession? = nil
 
+    /// `true` si hay cualquier popup encima del Free Mode.
+    private var isAnyPopupOpen: Bool {
+        showHistory || showDiscardConfirm || showEqualizer || noteSession != nil
+    }
+
     @Environment(\.scenePhase) private var scenePhase
 
     private let workBackground = Color(red: 0.11, green: 0.12, blue: 0.13)
@@ -62,10 +67,10 @@ struct FreeModeView: View {
     private var backSwipeGesture: some Gesture {
         DragGesture(minimumDistance: 20)
             .onEnded { value in
+                guard !isAnyPopupOpen else { return }
                 #if os(iOS)
                 if value.translation.height < -60 { onBack() }
                 #else
-                // Drag DERECHA → volver a presets.
                 if value.translation.width > 60 { onBack() }
                 #endif
             }

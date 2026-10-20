@@ -49,6 +49,13 @@ struct SavedPresetsView: View {
     @State private var showSyncSettings = false
     @State private var showUnlinkConfirm = false
 
+    /// `true` si hay cualquier popup encima de la lista de presets.
+    /// Bloquea la navegación por gesto y scroll para que no se dispare
+    /// mientras el usuario interactúa con el popup.
+    private var isAnyModalOpen: Bool {
+        showStats || showTimerInProgress || showSyncSettings || showUnlinkConfirm
+    }
+
     // Preset pendiente de arrancar
     @State private var configToStart: PomodoroConfigDTO? = nil
 
@@ -118,11 +125,11 @@ struct SavedPresetsView: View {
         .onChange(of: selectedConfigId) { _, newValue in
             handleSelectedConfigChange(newValue)
         }
-        #if os(macOS)
-        .scrollWheelBack {
-            onNavigate?(.mainTimer, nil)
-        }
-        #endif
+#if os(macOS)
+.scrollWheelBack {
+    if !isAnyModalOpen { onNavigate?(.mainTimer, nil) }
+}
+#endif
         .gesture(navigationDragGesture)
         #if os(macOS)
         .focusable()
@@ -139,9 +146,9 @@ struct SavedPresetsView: View {
     @ViewBuilder
     private var navigationKeyShortcuts: some View {
         Group {
-            Button("") { onNavigate?(.mainTimer, nil) }
+            Button("") { if !isAnyModalOpen { onNavigate?(.mainTimer, nil) } }
                 .keyboardShortcut(.downArrow, modifiers: [])
-            Button("") { onNavigate?(.mainTimer, nil) }
+            Button("") { if !isAnyModalOpen { onNavigate?(.mainTimer, nil) } }
                 .keyboardShortcut(.upArrow, modifiers: [])
         }
         .opacity(0)
@@ -464,6 +471,7 @@ struct SavedPresetsView: View {
     private var navigationDragGesture: some Gesture {
         DragGesture()
             .onEnded { value in
+                guard !isAnyModalOpen else { return }
                 let translation = value.translation
                 #if os(macOS)
                 if translation.width < -40 && abs(translation.width) > abs(translation.height) {
