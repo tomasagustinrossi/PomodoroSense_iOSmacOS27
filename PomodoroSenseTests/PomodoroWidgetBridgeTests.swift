@@ -15,7 +15,7 @@ import Testing
 import Foundation
 @testable import PomodoroSense
 
-@Suite("PomodoroWidgetBridge — contrato de claves")
+@Suite("PomodoroWidgetBridge — contrato de claves", .tags(.newTest1))
 struct PomodoroWidgetBridgeTests {
 
     @Test("Las claves no cambiaron (evita regresiones silenciosas)")

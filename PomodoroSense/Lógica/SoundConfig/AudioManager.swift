@@ -76,7 +76,9 @@ final class AudioManager: AudioEngineProtocol {
         }
     }
 
-    func keepAppAlive(enable: Bool) {}
+    func keepAppAlive(enable: Bool) {
+        SyncKeepAlive.shared.setEnabled(enable, reason: "timer")
+    }
 
     // MARK: - Grafo
 

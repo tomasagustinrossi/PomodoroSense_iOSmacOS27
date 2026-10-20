@@ -100,6 +100,7 @@ final class LocalSyncEngine {
     private var pendingDialEndpoint: NWEndpoint?
     private var activePeerEndpoint: NWEndpoint?
     private var handshakeComplete = false
+    private var connectedPeerName: String?
 
     private(set) var currentRole: LocalSyncRole
     weak var delegate: LocalSyncEngineDelegate?
@@ -403,8 +404,9 @@ final class LocalSyncEngine {
         connection?.onEvent = nil // evita eventos de la conexión que estamos cerrando
         connection?.stop()
         connection = nil
-
+        
         handshakeComplete = false
+        connectedPeerName = nil
         localHello = nil
         peerHello = nil
         activePeerEndpoint = nil
@@ -518,6 +520,17 @@ final class LocalSyncEngine {
                     self.rejectStrayPeer(newConnection)
                     return
                 }
+                
+                if self.handshakeComplete {
+                    // Misma conexión recuperada de un .waiting: no rehacer el handshake.
+                    let peerEndpoint = self.activePeerEndpoint ?? peer
+                    self.currentState = .connected(peer: peerEndpoint,
+                                                   role: self.currentRole,
+                                                   peerName: self.connectedPeerName ?? "Unknown Device")
+                    return
+                }
+                guard self.localHello == nil else { return }
+                
                 // TLS establecido. NO notificamos todavía: primero hay que
                 // intercambiar `hello` para negociar rol y aprender el nombre.
                 self.connectTimeoutTask?.cancel()
@@ -632,6 +645,7 @@ final class LocalSyncEngine {
 
         let peer = activePeerEndpoint ?? .hostPort(host: "unknown", port: 0)
         print("🤝 [Engine] Handshake OK — peer='\(peerName)' role=\(finalRole.rawValue)")
+        connectedPeerName = peerName
         currentState = .connected(peer: peer, role: finalRole, peerName: peerName)
     }
 

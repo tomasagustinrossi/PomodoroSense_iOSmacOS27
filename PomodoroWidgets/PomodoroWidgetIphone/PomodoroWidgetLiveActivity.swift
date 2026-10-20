@@ -69,7 +69,7 @@ struct TimeRemainingText: View {
         // CLAVE: Fuerza a SwiftUI a destruir y recrear la vista de texto cuando
         // cambia de estado (corriendo a pausado y viceversa). Sin esto,
         // Text(timerInterval:) ignora las actualizaciones.
-        .id("\(state.isRunning)-\(state.isFreeMode)-\(state.pausedSeconds ?? 0)")
+        .id("\(state.isRunning)-\(state.isFreeMode)-\(state.isBreak)-\(state.pausedSeconds ?? 0)-\(state.targetDate.timeIntervalSince1970)")
     }
 }
 

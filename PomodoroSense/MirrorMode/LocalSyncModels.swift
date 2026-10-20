@@ -62,4 +62,5 @@ enum MirrorCommand: String, Codable, Sendable {
     case skipNext
     case skipPrevious
     case stop
+    case requestState
 }

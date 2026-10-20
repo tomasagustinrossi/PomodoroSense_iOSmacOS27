@@ -33,6 +33,7 @@ final class LocalSyncConnection {
 
     private let connection: NWConnection
     private var hasStarted = false
+    private var hasStartedReading = false
     private var isReady = false
     private var isClosed = false
 
@@ -133,6 +134,8 @@ final class LocalSyncConnection {
             print("✅ [Connection] Túnel TLS establecido.")
             isReady = true
             onEvent?(.connected)
+            guard !hasStartedReading else { return }
+            hasStartedReading = true
             readNextFrameHeader()
 
         case .waiting(let error):

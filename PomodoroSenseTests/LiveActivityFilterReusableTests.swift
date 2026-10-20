@@ -17,7 +17,7 @@ import Foundation
 
 // MARK: - Reusabilidad de la isla de Pomodoro (bug A1)
 
-@Suite("LiveActivityFilter — isReusablePomodoro")
+@Suite("LiveActivityFilter — isReusablePomodoro", .tags(.newTest1))
 struct LiveActivityFilterReusableTests {
 
     @Test("Activity activa de Pomodoro → reusable")
@@ -68,7 +68,7 @@ struct LiveActivityFilterReusableTests {
 
 // MARK: - Cierre selectivo (bugs A2, A3)
 
-@Suite("LiveActivityFilter — shouldEndAll")
+@Suite("LiveActivityFilter — shouldEndAll", .tags(.newTest1))
 struct LiveActivityFilterShouldEndTests {
 
     // ── filter == nil → cerrar TODAS ──

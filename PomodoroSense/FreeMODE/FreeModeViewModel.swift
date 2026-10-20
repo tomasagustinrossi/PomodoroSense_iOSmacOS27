@@ -235,7 +235,7 @@ private var localCommandObserver: NSObjectProtocol?
         #if os(iOS) && canImport(ActivityKit)
         guard #available(iOS 16.2, *) else { return }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
-
+        
         let state = PomodoroAttributes.ContentState(
             isBreak: false,
             currentSession: 1,

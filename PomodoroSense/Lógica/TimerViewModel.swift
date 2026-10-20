@@ -413,9 +413,6 @@ class TimerViewModel: ObservableObject {
                 freqId: activeConfig.audio.freqId
             )
         }
-
-        savePersistedState()
-        broadcastState()
         return false
     }
 
@@ -800,6 +797,7 @@ class TimerViewModel: ObservableObject {
         // solo refresca su display y espera el próximo estado del Master.
         if isMirror {
             mirrorTick()
+            syncEngine?.sendMirrorCommand(.requestState)
             return
         }
         resumeTimerAfterReconciliation(checkForKill: false)
@@ -1117,6 +1115,7 @@ class TimerViewModel: ObservableObject {
     private func startLiveActivity(target: Date) {
 
 #if os(iOS) && canImport(ActivityKit)
+        print("🎬 [LA] start llamado. enabled=\(ActivityAuthorizationInfo().areActivitiesEnabled)")
         guard #available(iOS 16.2, *) else { return }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
 
@@ -1149,7 +1148,9 @@ class TimerViewModel: ObservableObject {
         if let knownId = currentActivityId,
            let known = activeActivities.first(where: { $0.id == knownId }) {
             Task {
+                print("🎬 [LA] update → id=\(known.id) estado=\(known.activityState) isBreak=\(isBreak) target=\(target)")
                 await known.update(content)
+                print("🎬 [LA] update OK id=\(known.id) estado=\(known.activityState)")
             }
             return
         }
@@ -1761,9 +1762,6 @@ class TimerViewModel: ObservableObject {
         let remoteHasSession = state.targetDate != nil || (state.pausedSeconds ?? 0) > 0
         isMirroringActiveSession = remoteHasSession
 
-        AudioManager.shared.stopBackgroundImmediate()
-        AudioManager.shared.keepAppAlive(enable: false)
-
         if !remoteHasSession {
             showMirrorIdle()
             return
@@ -2103,6 +2101,8 @@ extension TimerViewModel: LocalSyncEngineDelegate {
             _ = skipToPreviousPhase()
         case .stop:
             userStopAndReset()
+        case .requestState:
+            broadcastState()
         }
     }
 }

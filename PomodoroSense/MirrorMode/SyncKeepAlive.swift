@@ -28,6 +28,17 @@ import AVFoundation
 final class SyncKeepAlive {
 
     static let shared = SyncKeepAlive()
+    private var reasons = Set<String>()
+    
+    func setEnabled(_ enabled: Bool, reason: String = "sync") {
+        #if os(iOS)
+        if enabled { reasons.insert(reason) } else { reasons.remove(reason) }
+        let shouldRun = !reasons.isEmpty
+        guard shouldRun != requested else { return }
+        requested = shouldRun
+        shouldRun ? start() : stop()
+        #endif
+    }
 
     private var requested = false
 
@@ -143,7 +154,7 @@ final class SyncKeepAlive {
 
     private func restartIfRequested() {
         guard requested else { return }
-        stop()
+        if engine.isRunning && player.isPlaying { return }
         start()
     }
 
