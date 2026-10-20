@@ -23,7 +23,6 @@
   <a href="https://polyformproject.org/licenses/noncommercial/1.0.0/">
     <img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue" />
   </a>
-  <img src="https://img.shields.io/badge/vibe--coded-yes-orange?logo=openai&logoColor=white" />
   <a href="https://github.com/tomasagustinrossi">
     <img src="https://img.shields.io/badge/Author-Tomas%20Rossi-blue" />
   </a>
