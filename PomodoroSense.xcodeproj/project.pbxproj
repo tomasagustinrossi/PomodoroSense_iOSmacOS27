@@ -64,6 +64,11 @@
 		6691EF353079EA91002A5C65 /* PomodoroWidgetExtensionDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PomodoroWidgetExtensionDebug.entitlements; sourceTree = "<group>"; };
 		66E602F73087DD1500460288 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		66E602F93087E61E00460288 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		66E602FA3087EC5400460288 /* calendar.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = calendar.png; sourceTree = "<group>"; };
+		66E602FB3087EC5400460288 /* equalizer.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = equalizer.png; sourceTree = "<group>"; };
+		66E602FC3087EC5400460288 /* pomodorosense-hero-card.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "pomodorosense-hero-card.png"; sourceTree = "<group>"; };
+		66E602FD3087EC5400460288 /* shop.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = shop.png; sourceTree = "<group>"; };
+		66E602FE3087EC5400460288 /* timer.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = timer.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -281,6 +286,7 @@
 				661B064E3072DF53000890AC /* Products */,
 				66E602F73087DD1500460288 /* LICENSE */,
 				66E602F93087E61E00460288 /* README.md */,
+				66E602FF3087EC5400460288 /* Screenshots */,
 			);
 			sourceTree = "<group>";
 		};
@@ -302,6 +308,18 @@
 				668E84C630757D3900C0779F /* SwiftUI.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		66E602FF3087EC5400460288 /* Screenshots */ = {
+			isa = PBXGroup;
+			children = (
+				66E602FA3087EC5400460288 /* calendar.png */,
+				66E602FB3087EC5400460288 /* equalizer.png */,
+				66E602FC3087EC5400460288 /* pomodorosense-hero-card.png */,
+				66E602FD3087EC5400460288 /* shop.png */,
+				66E602FE3087EC5400460288 /* timer.png */,
+			);
+			path = Screenshots;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
