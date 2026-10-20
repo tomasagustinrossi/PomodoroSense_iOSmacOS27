@@ -1,26 +1,13 @@
-//
-//  FreeModeView.swift
-//  PomodoroSense
-//
-//  Created by Tomas Rossi on 17/10/2026.
-//
-
-
-//
-//  FreeModeView.swift
-//  PomodoroSense
-//
-
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct FreeModeView: View {
     @ObservedObject var viewModel: FreeModeViewModel
     var onBack: () -> Void
 
     @State private var showHistory = false
-    @State private var showMusicImporter = false
     @State private var showDiscardConfirm = false
+    @State private var showEqualizer = false
+    @State private var noteSession: FreeModeSession? = nil
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -36,14 +23,14 @@ struct FreeModeView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 0) {
                         header
-                        Spacer(minLength: 30)
+                        Spacer(minLength: 32)
                         timerDisplay
-                        Spacer(minLength: 30)
+                        Spacer(minLength: 32)
                         controls
-                        Spacer(minLength: 30)
-                        musicSection
+                        Spacer(minLength: 32)
+                        audioSection
                     }
-                    .padding(.horizontal, 30)
+                    .padding(.horizontal, 32)
                     .padding(.top, 24)
                     .padding(.bottom, 24)
                     .frame(minHeight: geo.size.height)
@@ -51,18 +38,8 @@ struct FreeModeView: View {
             }
         }
         .overlay { historyOverlay }
-        .fileImporter(
-            isPresented: $showMusicImporter,
-            allowedContentTypes: [.audio],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first { viewModel.importMusic(from: url) }
-            case .failure(let error):
-                print("[FreeMode] Importer error: \(error)")
-            }
-        }
+        .overlay { equalizerOverlay }
+        .overlay { noteOverlay }
         .confirmationDialog(
             "Discard this session?",
             isPresented: $showDiscardConfirm,
@@ -76,7 +53,25 @@ struct FreeModeView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active { viewModel.restartTickerIfNeeded() }
         }
+        .gesture(backSwipeGesture)
     }
+
+    // MARK: - Swipe de salida
+    // iOS: swipe UP → volver.
+    // macOS: swipe LEFT → volver.
+    private var backSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 20)
+            .onEnded { value in
+                #if os(iOS)
+                if value.translation.height < -60 { onBack() }
+                #else
+                // Drag DERECHA → volver a presets.
+                if value.translation.width > 60 { onBack() }
+                #endif
+            }
+    }
+
+    // MARK: - Header
 
     // MARK: - Header
 
@@ -88,7 +83,7 @@ struct FreeModeView: View {
                     .foregroundColor(textDimmedWork)
                     .frame(width: 24, height: 24)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.pressable)
 
             Spacer()
 
@@ -100,14 +95,17 @@ struct FreeModeView: View {
             Spacer()
 
             Button {
-                withAnimation(.easeInOut(duration: 0.25)) { showHistory = true }
+                Haptics.impact(.light, intensity: 0.6)
+                withAnimation(HIGMotion.state) {
+                    showHistory = true
+                }
             } label: {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(textDimmedWork)
                     .frame(width: 24, height: 24)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.pressable)
             .accessibilityLabel("Session history")
         }
     }
@@ -115,24 +113,28 @@ struct FreeModeView: View {
     // MARK: - Timer
 
     private var timerDisplay: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 16) {
             Text(viewModel.formattedElapsed)
                 .font(.system(size: 88, weight: .ultraLight, design: .default))
                 .monospacedDigit()
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.4)
+                .contentTransition(.numericText(countsDown: false))
+                .animation(HIGMotion.numeric, value: viewModel.formattedElapsed)
                 .padding(.horizontal, 10)
 
             Text(statusLabel)
                 .font(.system(size: 11, weight: .bold))
                 .tracking(3)
                 .foregroundColor(workAccent)
+                .contentTransition(.opacity)
+                .animation(HIGMotion.state, value: statusLabel)
         }
     }
 
     private var statusLabel: String {
-        if viewModel.isRunning { return "RUNNING" }
+        if viewModel.isRunning { return "FOCUS" }
         if viewModel.elapsed > 0 { return "PAUSED" }
         return "READY"
     }
@@ -140,7 +142,7 @@ struct FreeModeView: View {
     // MARK: - Controles
 
     private var controls: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 24) {
             Button(action: { viewModel.toggleTimer() }) {
                 Image(systemName: viewModel.isRunning ? "pause.fill" : "play.fill")
                     .font(.system(size: 28, weight: .black))
@@ -150,129 +152,119 @@ struct FreeModeView: View {
                     .clipShape(Circle())
                     .shadow(color: workAccent.opacity(0.3), radius: 15, x: 0, y: 8)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(viewModel.isRunning ? "Pause timer" : "Start timer")
+            .buttonStyle(.pressable)
+            // HIG: la respuesta háptica se dispara con el cambio de estado, no con el tap
+            .onChange(of: viewModel.isRunning) { _, running in
+                Haptics.impact(running ? .medium : .soft, intensity: 0.85)
+            }
 
             if viewModel.elapsed > 0 {
-                HStack(spacing: 12) {
-                    Button(action: { showDiscardConfirm = true }) {
+                HStack(spacing: 16) {
+                    Button(action: {
+                        Haptics.warning()
+                        showDiscardConfirm = true
+                    }) {
                         HStack(spacing: 6) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 11, weight: .bold))
-                            Text("DISCARD")
-                                .font(.system(size: 11, weight: .bold))
-                                .tracking(1.5)
+                            Image(systemName: "xmark").font(.system(size: 11, weight: .bold))
+                            Text("DISCARD").font(.system(size: 11, weight: .bold)).tracking(1.5)
                         }
                         .foregroundColor(textDimmedWork)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
+                        .padding(.horizontal, 16).padding(.vertical, 10)
                         .background(
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                                .environment(\.colorScheme, .dark)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .stroke(textDimmedWork.opacity(0.3), lineWidth: 1)
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.pressable)
 
-                    Button(action: { _ = viewModel.finishSession() }) {
+                    Button(action: {
+                        // Éxito solo si la sesión se guardó (≥ 5 min); si no, un toque suave.
+                        if viewModel.finishSession() != nil {
+                            Haptics.success()
+                        } else {
+                            Haptics.impact(.soft, intensity: 0.6)
+                        }
+                    }) {
                         HStack(spacing: 6) {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .bold))
-                            Text("FINISH")
-                                .font(.system(size: 11, weight: .bold))
-                                .tracking(1.5)
+                            Image(systemName: "checkmark").font(.system(size: 11, weight: .bold))
+                            Text("FINISH").font(.system(size: 11, weight: .bold)).tracking(1.5)
                         }
                         .foregroundColor(workBackground)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
+                        .padding(.horizontal, 16).padding(.vertical, 10)
                         .background(
-                            RoundedRectangle(cornerRadius: 10).fill(workAccent)
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(workAccent)
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.pressable)
                 }
-                .transition(.opacity)
+                // HIG: entrada física con spring, no fade plano
+                .transition(.asymmetric(
+                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                    removal: .opacity
+                ))
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: viewModel.elapsed > 0)
+        // HIG: spring > easeInOut para cambios de estado visibles
+        .animation(HIGMotion.state, value: viewModel.elapsed > 0)
     }
 
-    // MARK: - Música
+    // MARK: - Audio
 
-    private var musicSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("MUSIC")
+    private var audioSection: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("AUDIO")
                     .font(.system(size: 10, weight: .bold))
                     .tracking(2)
                     .foregroundColor(textDimmedWork)
 
-                Spacer()
-
-                if viewModel.musicTitle != nil {
-                    Button { viewModel.removeMusic() } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(textDimmedWork.opacity(0.6))
-                            .contentShape(Rectangle().inset(by: -6))
-                    }
-                    .buttonStyle(.plain)
-                }
+                Text(audioSummary)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(1)
             }
 
-            if let title = viewModel.musicTitle {
-                HStack(spacing: 12) {
-                    Button { viewModel.toggleMusic() } label: {
-                        Image(systemName: viewModel.isMusicPlaying
-                              ? "pause.circle.fill"
-                              : "play.circle.fill")
-                            .font(.system(size: 30, weight: .medium))
-                            .foregroundColor(workAccent)
-                    }
-                    .buttonStyle(.plain)
+            Spacer()
 
-                    Text(title)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    Button { showMusicImporter = true } label: {
-                        Text("CHANGE")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(1.5)
-                            .foregroundColor(textDimmedWork)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.white.opacity(0.04))
-                )
-            } else {
-                Button { showMusicImporter = true } label: {
-                    HStack {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 14, weight: .semibold))
-                        Text("ADD MUSIC")
-                            .font(.system(size: 11, weight: .bold))
-                            .tracking(1.5)
-                        Spacer()
-                    }
+            Button {
+                Haptics.selection()
+                withAnimation(HIGMotion.overlay) { showEqualizer = true }
+            } label: {
+                Image(systemName: "music.note")
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(workAccent)
-                    .padding(14)
+                    .frame(width: 36, height: 36)
                     .background(
-                        RoundedRectangle(cornerRadius: 10)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .stroke(workAccent.opacity(0.3), lineWidth: 1)
                     )
-                }
-                .buttonStyle(.plain)
             }
+            .buttonStyle(.pressable)
+            .accessibilityLabel("Audio settings")
         }
     }
 
-    // MARK: - Overlay historial
+    private var audioSummary: String {
+        let noise = AmbientSound.from(id: viewModel.noiseId).displayName
+        let freq: String
+        switch viewModel.freqId {
+        case 1: freq = "40 HZ"
+        case 2: freq = "15 HZ"
+        case 3: freq = "10 HZ"
+        case 4: freq = "6 HZ"
+        default: freq = ""
+        }
+        if freq.isEmpty { return noise }
+        return "\(freq) · \(noise)"
+    }
+
+    // MARK: - Overlays
 
     @ViewBuilder
     private var historyOverlay: some View {
@@ -281,11 +273,63 @@ struct FreeModeView: View {
                 sessions: viewModel.sessions,
                 onDelete: { viewModel.deleteSession(id: $0) },
                 onClearAll: { viewModel.clearHistory() },
+                onEditNote: { session in
+                    withAnimation(HIGMotion.overlay) {
+                        noteSession = session
+                    }
+                },
                 accentColor: workAccent,
                 dimmedColor: textDimmedWork,
                 backgroundColor: workBackground,
                 onDismiss: {
-                    withAnimation(.easeInOut(duration: 0.25)) { showHistory = false }
+                    withAnimation(HIGMotion.state) { showHistory = false }
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var equalizerOverlay: some View {
+        if showEqualizer {
+            ZStack {
+                HIGScrim {
+                    withAnimation(HIGMotion.overlay) { showEqualizer = false }
+                }
+                .transition(.opacity)
+
+                EqualizerSheetView(
+                    initialNoiseId: viewModel.noiseId,
+                    initialFreqId: viewModel.freqId,
+                    accentColor: workAccent,
+                    dimmedColor: textDimmedWork,
+                    backgroundColor: workBackground,
+                    onNoiseChanged: { viewModel.updateNoiseId($0) },
+                    onFreqChanged: { viewModel.updateFreqId($0) },
+                    onDismiss: {
+                        withAnimation(HIGMotion.overlay) { showEqualizer = false }
+                    }
+                )
+                .frame(maxWidth: 460, maxHeight: 520)
+                .shadow(color: .black.opacity(0.4), radius: 30, x: 0, y: 12)
+                .transition(.scale(scale: 0.95).combined(with: .opacity))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var noteOverlay: some View {
+        if let session = noteSession {
+            FreeModeNotePopup(
+                session: session,
+                accentColor: workAccent,
+                dimmedColor: textDimmedWork,
+                backgroundColor: workBackground,
+                onSave: { newNote in
+                    viewModel.updateNote(for: session.id, note: newNote)
+                    withAnimation(HIGMotion.overlay) { noteSession = nil }
+                },
+                onDismiss: {
+                    withAnimation(HIGMotion.overlay) { noteSession = nil }
                 }
             )
         }

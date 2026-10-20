@@ -5,6 +5,7 @@
 //  Created by Tomas Rossi on 08/10/2026.
 //
 
+import SwiftUI // <- La pieza faltante para la resolución de símbolos
 
 // MARK: - Ficha de casino (ícono vectorial)
 

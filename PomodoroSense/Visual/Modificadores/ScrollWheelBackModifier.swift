@@ -2,9 +2,6 @@
 //  ScrollWheelBackModifier.swift
 //  PomodoroSense
 //
-//  Created by Tomas Rossi on 08/10/2026.
-//
-
 
 import SwiftUI
 #if os(macOS)
@@ -19,10 +16,14 @@ struct ScrollWheelBackModifier: ViewModifier {
             .onAppear {
                 guard monitor == nil else { return }
                 monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
-                    let isUpward = event.scrollingDeltaY > 3
-                    let isMostlyVertical = abs(event.scrollingDeltaX) < abs(event.scrollingDeltaY)
+                    // Cualquier scroll vertical con magnitud dispara la acción.
+                    // En SavedPresets la lista es horizontal (macOS), así que el
+                    // scroll vertical no tiene otro significado.
+                    // Funciona con natural scrolling ON u OFF porque usa abs().
+                    let isVertical   = abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX)
+                    let hasMagnitude = abs(event.scrollingDeltaY) > 3
                     let isNotInertia = event.momentumPhase != .changed
-                    if isUpward && isMostlyVertical && isNotInertia {
+                    if isVertical && hasMagnitude && isNotInertia {
                         action()
                     }
                     return event

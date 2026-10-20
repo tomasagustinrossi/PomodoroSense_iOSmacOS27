@@ -34,12 +34,18 @@ enum DebugUserData {
     // MARK: - Wallet
 
     /// nil = no toca el valor persistido.
-    static let bronze: Int? = 500
-    static let silver: Int? = 100
-    static let gold:   Int? = 20
+    static let bronze: Int? = 1000
+    static let silver: Int? = 500
+    static let gold:   Int? = 500
 
     /// Tiers desbloqueados. nil = no toca.
-    static let unlockedTiers: Set<CurrencyTier>? = [.bronze, .silver, .gold]
+    static let unlockedTiers: Set<CurrencyTier>? = nil //[.bronze, .silver, .gold]
+    
+    /// ⚠️ NUEVO: Si es true, borra TODOS los datos guardados en UserDefaults
+    /// (wallet, records, objetivos, items comprados, sesión en curso) antes de
+    /// inyectar los datos de acá. Hace que cada "Play" en Xcode sea un lienzo en blanco.
+    static let resetOnLaunch: Bool = true
+
 
     /// Fuerza el flag que hace visible la tienda.
     /// nil → se deriva: true si bronze+silver+gold > 0.
@@ -49,7 +55,7 @@ enum DebugUserData {
 
     /// IDs de items comprados.
     /// nil = no toca. `[]` = ningún item.
-    static let purchasedItemIds: Set<String>? = ["bronze.bolt", "silver.eye"]
+    static let purchasedItemIds: Set<String>? = [] // Ej. "bronze.bolt", "silver.eye"
 
     /// Atajo: si true, compra TODOS los items del catálogo (ignora purchasedItemIds).
     static let purchaseAllItems: Bool = false
@@ -69,3 +75,32 @@ enum DebugUserData {
     static let recordFocusMinutes: Int = 30
 }
 #endif
+
+
+/*
+ EJEMPLO 1 Usuario nuevo (shop oculto, colección vacía)
+ 
+ static let isEnabled = true
+ static let bronze: Int? = 0
+ static let silver: Int? = nil
+ static let gold: Int? = nil
+ static let unlockedTiers: Set<CurrencyTier>? = [.bronze]
+ static let purchasedItemIds: Set<String>? = []
+ static let injectRecords: Bool = false
+ */
+/*
+ EJEMPLO 2 Usuario rico con todo comprado
+ 
+ static let bronze: Int? = 999
+ static let silver: Int? = 499
+ static let gold: Int? = 199
+ static let purchaseAllItems: Bool = true
+ static let injectRecords: Bool = true
+ static let recordsDaysBack: Int = 60
+ */
+
+/*
+ Apagar todo el modo debug
+ 
+ static let isEnabled = false
+ */

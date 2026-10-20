@@ -1,3 +1,11 @@
+//
+//  FreeModeNotePopup.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 17/10/2026.
+//
+
+
 import SwiftUI
 
 struct FreeModeNotePopup: View {

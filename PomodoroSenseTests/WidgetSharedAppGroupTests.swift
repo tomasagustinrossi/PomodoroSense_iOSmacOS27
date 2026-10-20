@@ -1,4 +1,12 @@
 //
+//  WidgetSharedAppGroupTests.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 12/10/2026.
+//
+
+
+//
 //  WidgetSharedTests.swift
 //  PomodoroSenseTests
 //

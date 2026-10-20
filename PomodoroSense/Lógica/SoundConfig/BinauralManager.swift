@@ -29,7 +29,7 @@ final class BinauralManager {
         guard startEngineIfNeeded() else { return }
 
         // Fade in más largo y perceptible al arrancar.
-        renderer.setMasterFadeDuration(1.2)
+        renderer.setMasterFadeDuration(AudioBalance.fadeInDuration)
         renderer.targetMasterGain = 1
         isPlaying = true
     }
@@ -46,14 +46,14 @@ final class BinauralManager {
         guard isPlaying else { return }
 
         // Fade out perceptible al pausar.
-        renderer.setMasterFadeDuration(0.9)
+        renderer.setMasterFadeDuration(AudioBalance.pauseFadeDuration)
         renderer.targetMasterGain = 0
         isPlaying = false
         scheduleEnginePause(after: 1.3)
     }
 
     func stop() {
-        renderer.setMasterFadeDuration(1.6)   // Fade out largo al terminar sesión.
+        renderer.setMasterFadeDuration(AudioBalance.stopFadeDuration)   // Fade out largo al terminar sesión.
         renderer.targetMasterGain = 0
         renderer.targetNoiseGain = 0
         renderer.targetToneGain = 0
@@ -67,7 +67,7 @@ final class BinauralManager {
     /// que el fade-out del anterior se solape con el fade-in del nuevo.
     func stopImmediate() {
         pauseTask?.cancel()
-        renderer.setMasterFadeDuration(0.15)
+        renderer.setMasterFadeDuration(AudioBalance.quickFadeDuration)
         renderer.targetMasterGain = 0
         renderer.targetNoiseGain = 0
         renderer.targetToneGain = 0
@@ -114,7 +114,7 @@ final class BinauralManager {
         let newSourceNode = renderer.makeSourceNode(format: stereoFormat)
 
         audioEngine.attach(newSourceNode)
-        try audioEngine.connectNode(
+        try audioEngine.connectNode( 
             newSourceNode,
             to: audioEngine.mainMixerNode,
             format: stereoFormat
@@ -124,6 +124,10 @@ final class BinauralManager {
         graphSampleRate = sampleRate
     }
 
+    /// Pausa el motor de audio después de un fade-out.
+    /// Usa `stop()` en vez de `pause()` porque `stop()` libera más
+    /// recursos (buffers, threads internos). El engine se reconstruye
+    /// on-demand en `startEngineIfNeeded`.
     private func scheduleEnginePause(after seconds: TimeInterval) {
         pauseTask?.cancel()
 
@@ -134,22 +138,25 @@ final class BinauralManager {
                 return
             }
 
-            self.audioEngine.pause()
+            self.audioEngine.stop()
+            // Nota: NO desactivamos la sesión acá. Si hay otra fuente de
+            // audio activa (ej: ambience file-based), desactivarla mataría
+            // el audio de fondo. La sesión se libera cuando la app cierra.
         }
     }
 
     // Curva exponencial: más resolución cerca de 0, comprimida cerca de 1.
-    // Volumen base bajado de 0.16 → 0.11.
+    // Parámetros en `AudioBalance.swift`.
     private func safeToneGain(for sliderValue: Float) -> Float {
         let normalized = min(max(sliderValue, 0), 1)
-        return powf(normalized, 1.8) * 0.11
+        return powf(normalized, AudioBalance.toneCurveExponent) * AudioBalance.maxToneGain
     }
 
-    // Curva exponencial simétrica con la del tono: mucha resolución cerca de 0,
-    // comprimida cerca del máximo. Antes era powf(x, 0.85) * 0.30 (casi lineal).
+    // Curva exponencial simétrica con la del tono.
+    // Parámetros en `AudioBalance.swift`.
     private func safeNoiseGain(for sliderValue: Float) -> Float {
         let normalized = min(max(sliderValue, 0), 1)
-        return powf(normalized, 1.6) * 0.30
+        return powf(normalized, AudioBalance.noiseCurveExponent) * AudioBalance.maxNoiseGain
     }
 }
 
@@ -240,9 +247,9 @@ nonisolated final class AmbientAudioRenderer: @unchecked Sendable {
     }
 
     private func recalculateSmoothings() {
-        parameterSmoothing = 1 - expf(-1 / (0.06 * sampleRate)) // 60 ms
+        parameterSmoothing = 1 - expf(-1 / (AudioBalance.parameterSmoothingSeconds * sampleRate))
         masterSmoothing    = 1 - expf(-1 / (masterFadeDuration * sampleRate))
-        noiseSmoothing     = 1 - expf(-1 / (0.12 * sampleRate))  // 120 ms
+        noiseSmoothing     = 1 - expf(-1 / (AudioBalance.noiseSmoothingSeconds * sampleRate))
     }
 
     // MARK: - Nodo de audio
@@ -298,8 +305,8 @@ nonisolated final class AmbientAudioRenderer: @unchecked Sendable {
         let shouldRenderTone = tone > 0.0001 || targetTone > 0.0001
         let radiansPerSample = (2 * Float.pi) / sampleRate
         // Frecuencia portadora a 432 Hz (afinación relajante).
-        let leftIncrement = 432 * radiansPerSample
-        let rightBaseFrequency: Float = 432
+        let leftIncrement = AudioBalance.carrierFrequency * radiansPerSample
+        let rightBaseFrequency: Float = AudioBalance.carrierFrequency
 
         for frame in 0..<frameCount {
             difference += (targetDifference - difference) * parameterSmoothing

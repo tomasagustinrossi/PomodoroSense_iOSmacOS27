@@ -23,8 +23,37 @@ final class SessionStore: ObservableObject {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        
+        #if DEBUG
+        // Si activamos resetOnLaunch en DebugUserData, limpiamos todo antes de cargar.
+        if DebugUserData.isEnabled && DebugUserData.resetOnLaunch {
+            wipeDebugState()
+        }
+        #endif
+        
         load()
     }
+
+#if DEBUG
+/// Borra todos los datos persistidos para arrancar de cero en el modo debug.
+private func wipeDebugState() {
+    let keysToWipe = [
+        recordsKey, reportsKey, userKey, goalsKey, "Pomodoro_Currency_Wallet",
+        // Agregamos las claves de la tienda y ajustes:
+        "shop_has_discovered_gold",
+        "shop_bgm_is_playing",
+        "mirror_mode_enabled",
+        "sfx_volume",
+        "Selected_Preset_Id"
+    ]
+    keysToWipe.forEach { defaults.removeObject(forKey: $0) }
+    
+    // También limpiamos la sesión en curso
+    TimerViewModel.clearPersistedSessionKeys()
+    
+    print("🧹 [Debug] Base de datos, tienda y ajustes reseteados a cero.")
+}
+#endif
 
 #if DEBUG
     /// Verificación en runtime del acceso al App Group.
@@ -439,7 +468,71 @@ final class SessionStore: ObservableObject {
         // Compacta records antiguos en reports. Corre en cada arranque;
         // si no hay nada para compactar, es no-op.
         compactOldRecordsIfNeeded()
+
+        #if DEBUG
+        applyDebugOverrides()
+        #endif
     }
+
+    #if DEBUG
+    /// Aplica los valores de `DebugUserData` en MEMORIA (no persiste).
+    /// Se corre después de `load()`, en cada arranque.
+    private func applyDebugOverrides() {
+        guard DebugUserData.isEnabled else { return }
+
+        // ── Wallet ──
+        if let v = DebugUserData.bronze { wallet.bronze = v }
+        if let v = DebugUserData.silver { wallet.silver = v }
+        if let v = DebugUserData.gold   { wallet.gold   = v }
+        if let tiers = DebugUserData.unlockedTiers {
+            wallet.unlockedTiers = tiers
+        }
+        if let ids = DebugUserData.purchasedItemIds {
+            wallet.purchasedItemIds = ids
+        }
+        if DebugUserData.purchaseAllItems {
+            wallet.purchasedItemIds = Set(ShopCatalog.allItems.map(\.id))
+        }
+        if let ever = DebugUserData.hasEverReceivedCurrency {
+            wallet.hasEverReceivedCurrency = ever
+        } else if (wallet.bronze + wallet.silver + wallet.gold) > 0 {
+            wallet.hasEverReceivedCurrency = true
+        }
+
+        // ── Records ──
+        if DebugUserData.injectRecords {
+            records.removeAll()
+            let cal = Calendar.current
+            let today = cal.startOfDay(for: Date())
+            let myId = SyncPersistence.shared.myPeerId
+            var injected: [PomodoroSessionRecord] = []
+
+            for offset in 0..<DebugUserData.recordsDaysBack {
+                // Salteamos algunos días para que el calendario no sea plano.
+                if offset > 3 && offset % 4 == 0 { continue }
+                guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { continue }
+
+                for n in 1...max(1, DebugUserData.recordsPerDay) {
+                    let record = PomodoroSessionRecord(
+                        id: UUID(),
+                        ownerDeviceId: myId,
+                        dayStart: day,
+                        timestamp: day.addingTimeInterval(3600 * 9 + Double(n) * 600),
+                        presetName: "DEBUG",
+                        focusMinutes: DebugUserData.recordFocusMinutes,
+                        sessionNumber: n,
+                        totalSessions: DebugUserData.recordsPerDay,
+                        wasSkipped: false,
+                        wasInterrupted: false,
+                        quality: SessionQuality.from(minutes: DebugUserData.recordFocusMinutes)
+                    )
+                    injected.append(record)
+                }
+            }
+            records = injected
+        }
+    }
+    #endif
     
     // MARK: - API de goals
     func goal(on day: Date) -> DailyGoal? {

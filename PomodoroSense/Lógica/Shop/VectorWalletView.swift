@@ -1,3 +1,12 @@
+//
+//  VectorWalletView.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 19/10/2026.
+//
+
+import SwiftUI
+
 // MARK: - Vector Wallet View
 
 /// Billetera de cuero dibujada con vectores, sin dependencias externas.

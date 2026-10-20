@@ -2,9 +2,10 @@
 //  ExtrudedIcon.swift
 //  PomodoroSense
 //
-//  Contornos -> SCNShape extruido con bisel y material metálico.
+//  Contornos -> malla extruida (ExtrudedMesh) con material metálico.
 //  Incluye: carga de imágenes/modelos del bundle, rasterizado de SF Symbols
 //  y el logo hexágono-cubo procedural.
+//  (Ya no usa SCNShape ni BezierPath.)
 //
 
 import SceneKit
@@ -19,32 +20,10 @@ func vec3(_ x: Double, _ y: Double, _ z: Double) -> SCNVector3 {
     SCNVector3(CGFloat(x), CGFloat(y), CGFloat(z))
 }
 
-// MARK: - BezierPath multiplataforma
-
-#if os(iOS)
-typealias BezierPath = UIBezierPath
-extension UIBezierPath {
-    func mv(_ p: CGPoint) { move(to: p) }
-    func ln(_ p: CGPoint) { addLine(to: p) }
-    func cubic(to p: CGPoint, c1: CGPoint, c2: CGPoint) {
-        addCurve(to: p, controlPoint1: c1, controlPoint2: c2)
-    }
-}
-#else
-typealias BezierPath = NSBezierPath
-extension NSBezierPath {
-    func mv(_ p: CGPoint) { move(to: p) }
-    func ln(_ p: CGPoint) { line(to: p) }
-    func cubic(to p: CGPoint, c1: CGPoint, c2: CGPoint) {
-        curve(to: p, controlPoint1: c1, controlPoint2: c2)
-    }
-}
-#endif
-
-// MARK: - Extrusión
+// MARK: - Extrusión desde imagen
 
 enum ExtrudedIcon {
-    static let span: CGFloat = 1.9
+    static let span: Double = 1.9
 
     private final class LoopsBox {
         let loops: [[CGPoint]]
@@ -52,41 +31,43 @@ enum ExtrudedIcon {
     }
     private static let cache = NSCache<NSString, LoopsBox>()
 
+    /// Contornos normalizados [-1, 1] (y hacia arriba), cacheados. Los usan la vista 3D y la 2D.
+    static func contours(cacheKey: String, image: () -> CGImage?) -> [[CGPoint]]? {
+        if let hit = cache.object(forKey: cacheKey as NSString) { return hit.loops }
+        guard let img = image() else { return nil }
+        let loops = ImageExtruder.contours(from: img)
+        cache.setObject(LoopsBox(loops), forKey: cacheKey as NSString)
+        return loops
+    }
+
+    /// Solo para visuals basados en imagen o símbolo (los modelos 3D y procedurales no tienen silueta 2D).
+    static func contours(for visual: ShopItemVisual) -> [[CGPoint]]? {
+        switch visual {
+        case .icon(let symbol):
+            return contours(cacheKey: "sf:\(symbol)") { SymbolRasterizer.cgImage(systemName: symbol) }
+        case .image(let name, _):
+            return contours(cacheKey: "img:\(name)") { AssetImageLoader.load(name) }
+        default:
+            return nil
+        }
+    }
+
     /// `cacheKey` identifica la imagen: los contornos (lo caro) se calculan una sola vez.
     static func node(cacheKey: String, metal: MetalStyle, depth: Double,
                      image: () -> CGImage?) -> SCNNode? {
-        let loops: [[CGPoint]]
-        if let hit = cache.object(forKey: cacheKey as NSString) {
-            loops = hit.loops
-        } else {
-            guard let img = image() else { return nil }
-            loops = ImageExtruder.contours(from: img)
-            cache.setObject(LoopsBox(loops), forKey: cacheKey as NSString)
+        guard let loops = contours(cacheKey: cacheKey, image: image) else { return nil }
+        guard !loops.isEmpty else {
+            print("⚠️ '\(cacheKey)': no se detectó ninguna silueta (¿PNG sin transparencia o muy claro?)")
+            return nil
         }
-        guard !loops.isEmpty else { return nil }
 
         let half = span / 2
-        let path = BezierPath()
-        for loop in loops {
-            // reversed(): exterior en sentido antihorario, huecos en horario.
-            let pts = loop.reversed().map { CGPoint(x: $0.x * half, y: $0.y * half) }
-            guard let first = pts.first else { continue }
-            path.mv(first)
-            for p in pts.dropFirst() { path.ln(p) }
-            path.close()
-        }
-        path.flatness = 0.005
-
-        let shape = SCNShape(path: path, extrusionDepth: CGFloat(depth))
-        shape.chamferRadius = CGFloat(min(0.03, depth * 0.12))
-        shape.chamferMode = .both
-        shape.materials = [metal.makeMaterial()]
-
-        let n = SCNNode(geometry: shape)
-        n.position = vec3(0, 0, -depth / 2)     // SCNShape extruye de z=0 a z=depth
-        let wrapper = SCNNode()
-        wrapper.addChildNode(n)
-        return wrapper
+        let scaled = loops.map { $0.map { CGPoint(x: Double($0.x) * half, y: Double($0.y) * half) } }
+        return ExtrudedMesh.node(
+            loops: scaled,
+            params: .init(depth: depth, bevel: min(0.03, depth * 0.12)),
+            material: metal.makeMaterial()
+        )
     }
 }
 
@@ -94,31 +75,74 @@ enum ExtrudedIcon {
 
 enum AssetImageLoader {
     /// Acepta: nombre de asset catalog, "archivo", "archivo.png" o "Carpeta/sub/archivo.png".
+    /// Busca: asset catalog -> ruta exacta -> raíz del bundle -> búsqueda recursiva (sin distinguir mayúsculas).
     static func load(_ name: String) -> CGImage? {
-        #if os(iOS)
-        if let cg = UIImage(named: name)?.cgImage { return cg }
-        #else
-        if let img = NSImage(named: name) {
-            var r = CGRect(origin: .zero, size: img.size)
-            if let cg = img.cgImage(forProposedRect: &r, context: nil, hints: nil) { return cg }
+        let base = ((name as NSString).lastPathComponent as NSString).deletingPathExtension
+        for key in [name, base] {
+            if let cg = catalogImage(key) { return cg }
         }
+        guard let url = BundleLookup.url(name, exts: ["png", "jpg", "jpeg", "webp", "heic"]) else {
+            print("⚠️ Imagen '\(name)' NO encontrada en el bundle. ¿Está en el target? ¿ShopItems es carpeta azul?")
+            return nil
+        }
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let img = CGImageSourceCreateImageAtIndex(src, 0, nil) else {
+            print("⚠️ Imagen '\(url.lastPathComponent)' encontrada pero no se pudo decodificar")
+            return nil
+        }
+        return img
+    }
+
+    private static func catalogImage(_ key: String) -> CGImage? {
+        #if os(iOS)
+        return UIImage(named: key)?.cgImage
+        #else
+        guard let img = NSImage(named: key) else { return nil }
+        var r = CGRect(origin: .zero, size: img.size)
+        return img.cgImage(forProposedRect: &r, context: nil, hints: nil)
         #endif
-        guard let url = BundleLookup.url(name, exts: ["png", "jpg", "jpeg", "webp", "heic"]),
-              let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        return CGImageSourceCreateImageAtIndex(src, 0, nil)
     }
 }
 
 enum BundleLookup {
+    private static var cache: [String: URL] = [:]
+    private static let lock = NSLock()
+
     static func url(_ name: String, exts: [String]) -> URL? {
+        lock.lock(); defer { lock.unlock() }
+        if let hit = cache[name] { return hit }
+
         let ns = name as NSString
         let dir = ns.deletingLastPathComponent
         let file = ns.lastPathComponent as NSString
         let base = file.deletingPathExtension
         let given = file.pathExtension
-        for e in (given.isEmpty ? exts : [given]) {
-            if let u = Bundle.main.url(forResource: base, withExtension: e,
-                                       subdirectory: dir.isEmpty ? nil : dir) { return u }
+        let candidates = given.isEmpty ? exts : [given]
+
+        var found: URL?
+        // 1) ruta exacta (carpeta azul / folder reference)
+        for e in candidates where found == nil {
+            found = Bundle.main.url(forResource: base, withExtension: e,
+                                    subdirectory: dir.isEmpty ? nil : dir)
+        }
+        // 2) archivo suelto en la raíz del bundle (carpeta agregada como grupo amarillo)
+        for e in candidates where found == nil {
+            found = Bundle.main.url(forResource: base, withExtension: e)
+        }
+        // 3) búsqueda recursiva por nombre, sin distinguir mayúsculas
+        if found == nil { found = recursiveFind(base: base, exts: candidates) }
+
+        if let f = found { cache[name] = f }
+        return found
+    }
+
+    private static func recursiveFind(base: String, exts: [String]) -> URL? {
+        guard let root = Bundle.main.resourceURL,
+              let en = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil) else { return nil }
+        let wanted = exts.map { $0.lowercased() }
+        for case let u as URL in en {
+            if u.deletingPathExtension().lastPathComponent.lowercased() == base.lowercased(),
+               wanted.contains(u.pathExtension.lowercased()) { return u }
         }
         return nil
     }
@@ -147,7 +171,7 @@ enum SymbolRasterizer {
     }
 }
 
-// MARK: - Logo procedural (hexágono-cubo), ahora más grueso y con el metal de la sección
+// MARK: - Logo procedural (hexágono-cubo)
 
 enum ProceduralShapes {
     static func node(_ shape: ProceduralShape, metal: MetalStyle) -> SCNNode {
@@ -159,23 +183,20 @@ enum ProceduralShapes {
     private static func hexCube(_ metal: MetalStyle) -> SCNNode {
         let root = SCNNode()
         let mat = metal.makeMaterial()
-        let ringDepth: CGFloat = 0.46
-        let barDepth: CGFloat = 0.34
-        let outerR = 1.0, innerR = 0.80
+        let ringDepth = 0.46
+        let barDepth: CGFloat = 0.40
+        let innerR = 0.80
 
-        let path = BezierPath()
-        appendHexagon(to: path, radius: outerR, corner: 0.10, reversed: false)
-        appendHexagon(to: path, radius: innerR, corner: 0.0, reversed: true)
-        path.flatness = 0.004
+        // Anillo: exterior redondeado + hueco hexagonal (malla propia: normales correctas)
+        let outer = hexLoop(radius: 1.0, corner: 0.10)
+        let inner = hexLoop(radius: innerR, corner: 0.0)
+        if let ring = ExtrudedMesh.node(loops: [outer, inner],
+                                        params: .init(depth: ringDepth, bevel: 0.03),
+                                        material: mat) {
+            root.addChildNode(ring)
+        }
 
-        let ring = SCNShape(path: path, extrusionDepth: ringDepth)
-        ring.chamferRadius = 0.03
-        ring.chamferMode = .both
-        ring.materials = [mat]
-        let ringNode = SCNNode(geometry: ring)
-        ringNode.position = vec3(0, 0, -Double(ringDepth) / 2)
-        root.addChildNode(ringNode)
-
+        // 3 barras que cruzan el centro = 6 radios
         for k in 0..<3 {
             let bar = SCNBox(width: 0.13, height: CGFloat(innerR * 2 + 0.05),
                              length: barDepth, chamferRadius: 0.02)
@@ -185,6 +206,7 @@ enum ProceduralShapes {
             root.addChildNode(n)
         }
 
+        // Cubitos sobre los radios
         for deg in [90.0, 210.0, 330.0] {
             let a = deg * .pi / 180
             let cube = SCNBox(width: 0.21, height: 0.21, length: 0.56, chamferRadius: 0.025)
@@ -197,28 +219,29 @@ enum ProceduralShapes {
         return root
     }
 
-    private static func appendHexagon(to path: BezierPath, radius: Double,
-                                      corner t: Double, reversed: Bool) {
-        var pts: [CGPoint] = (0..<6).map { i in
+    /// Hexágono con vértice arriba. `corner` = fracción del lado que se redondea.
+    private static func hexLoop(radius: Double, corner t: Double) -> [CGPoint] {
+        let base: [CGPoint] = (0..<6).map { i in
             let a = (90.0 + Double(i) * 60.0) * .pi / 180
             return CGPoint(x: cos(a) * radius, y: sin(a) * radius)
         }
-        if reversed { pts.reverse() }
+        guard t > 0 else { return base }
 
         func lerp(_ a: CGPoint, _ b: CGPoint, _ f: Double) -> CGPoint {
-            CGPoint(x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f)
+            CGPoint(x: Double(a.x) + (Double(b.x) - Double(a.x)) * f,
+                    y: Double(a.y) + (Double(b.y) - Double(a.y)) * f)
         }
-        let n = pts.count
-        for i in 0..<n {
-            let prev = pts[(i + n - 1) % n], cur = pts[i], next = pts[(i + 1) % n]
-            if t > 0 {
-                let a = lerp(cur, prev, t), b = lerp(cur, next, t)
-                if i == 0 { path.mv(a) } else { path.ln(a) }
-                path.cubic(to: b, c1: cur, c2: cur)
-            } else {
-                if i == 0 { path.mv(cur) } else { path.ln(cur) }
+        var out: [CGPoint] = []
+        for i in 0..<6 {
+            let prev = base[(i + 5) % 6], cur = base[i], next = base[(i + 1) % 6]
+            let a = lerp(cur, prev, t), b = lerp(cur, next, t)
+            for s in 0...6 {                              // bézier cúbica a, cur, cur, b
+                let u = Double(s) / 6, w = 1 - u
+                let x = w*w*w*Double(a.x) + 3*w*w*u*Double(cur.x) + 3*w*u*u*Double(cur.x) + u*u*u*Double(b.x)
+                let y = w*w*w*Double(a.y) + 3*w*w*u*Double(cur.y) + 3*w*u*u*Double(cur.y) + u*u*u*Double(b.y)
+                out.append(CGPoint(x: x, y: y))
             }
         }
-        path.close()
+        return out
     }
 }

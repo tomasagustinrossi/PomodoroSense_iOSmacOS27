@@ -2,14 +2,6 @@
 //  FreeModeHistoryPopup.swift
 //  PomodoroSense
 //
-//  Created by Tomas Rossi on 17/10/2026.
-//
-
-
-//
-//  FreeModeHistoryPopup.swift
-//  PomodoroSense
-//
 
 import SwiftUI
 
@@ -17,6 +9,7 @@ struct FreeModeHistoryPopup: View {
     let sessions: [FreeModeSession]
     var onDelete: ((UUID) -> Void)? = nil
     var onClearAll: (() -> Void)? = nil
+    var onEditNote: ((FreeModeSession) -> Void)? = nil
 
     var accentColor: Color
     var dimmedColor: Color
@@ -132,29 +125,44 @@ struct FreeModeHistoryPopup: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(dimmedColor)
 
-                if let title = session.musicTitle {
-                    HStack(spacing: 4) {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 9))
-                        Text(title)
-                            .font(.system(size: 10))
-                            .lineLimit(1)
-                    }
-                    .foregroundColor(dimmedColor.opacity(0.7))
+                if let note = session.note, !note.isEmpty {
+                    Text(note)
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundColor(dimmedColor.opacity(0.85))
+                        .lineLimit(2)
+                        .padding(.top, 2)
                 }
             }
 
             Spacer()
 
-            Button {
-                onDelete?(session.id)
-            } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(dimmedColor.opacity(0.5))
-                    .contentShape(Rectangle().inset(by: -6))
+            HStack(spacing: 6) {
+                Button {
+                    onEditNote?(session)
+                } label: {
+                    Image(systemName: session.note == nil
+                          ? "note.text.badge.plus"
+                          : "note.text")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(session.note == nil
+                                         ? dimmedColor.opacity(0.5)
+                                         : accentColor.opacity(0.85))
+                        .contentShape(Rectangle().inset(by: -6))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(session.note == nil ? "Add note" : "Edit note")
+
+                Button {
+                    onDelete?(session.id)
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(dimmedColor.opacity(0.5))
+                        .contentShape(Rectangle().inset(by: -6))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Delete session")
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 12)

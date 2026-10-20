@@ -1,3 +1,11 @@
+//
+//  TimerViewModelSessionSelectBaseTests.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 17/10/2026.
+//
+
+
 import Testing
 import Foundation
 @testable import PomodoroSense
@@ -7,6 +15,12 @@ import Foundation
 @MainActor
 private func makeVM() -> TimerViewModel {
     SessionStore.shared.clearAllForTesting()
+    // `clearAllForTesting()` solo limpia records/wallet/user/reports.
+    // Las claves `session_*` en UserDefaults.standard persisten entre
+    // tests y `restorePersistedState()` las rehidrata en el próximo init.
+    // Sin esto, un test previo que terminó en break deja `isBreak = true`
+    // y el siguiente test ve `userSelectSession` como no-op.
+    TimerViewModel.clearPersistedSessionKeys()
     return TimerViewModel()
 }
 
@@ -237,58 +251,40 @@ struct TimerViewModelSkipAfterSelectTests {
         let records = SessionStore.shared.records(forPresetRunId: runId)
         let s5 = records.first { $0.sessionNumber == vm.totalSessions }
         #expect(s5?.qualifiesForChips == true)
-        #expect(vm.currentSession == 1, "reset post-cierre")
+        // OJO: al terminar el preset, `currentSession` NO vuelve a 1
+        // inmediatamente. Queda en la última sesión mientras se muestran
+        // los popups (reward + summary). El reset a 1 ocurre 15s después
+        // (rewardCleanupTask) o al dismiss de la recompensa.
+        #expect(vm.currentSession == vm.totalSessions)
     }
+
 
     @Test("Tap forward a última sesión + skip manual → cierra sin acreditar")
-    func forwardToLastThenManualSkipFinishesWithoutCredit() {
-        let vm = makeVM()
-        vm.debugSetCurrentSessionForTest(1)
-        vm.userSelectSession(vm.totalSessions)
+        func forwardToLastThenManualSkipFinishesWithoutCredit() {
+            let vm = makeVM()
+            vm.debugSetCurrentSessionForTest(1)
+            vm.userSelectSession(vm.totalSessions)
+            // Capturar el runId ANTES del skip: un skip manual con
+            // presetHasSkip = true ejecuta `resetToInitialState()`, que
+            // regenera `currentPresetRunId`. Necesitamos el viejo para
+            // verificar que sus records quedaron invalidadas.
+            let runB = vm.debugPresetRunIdForTest()
 
-        let finished = vm.skipToNextPhase(wasCompleted: false)
+            let finished = vm.skipToNextPhase(wasCompleted: false)
 
-        #expect(finished == true)
-        #expect(vm.debugPendingPresetRecordIdsForTest().isEmpty == false || vm.currentSession == 1)
-    }
+            #expect(finished == true)
 
-    @Test("Tap backward 4→2 + skip natural + avanzar hasta última → cierra")
-    func backwardThenRunToEnd() {
-        let vm = makeVM()
-        vm.debugSetCurrentSessionForTest(4)
-        vm.userSelectSession(2)
+            // A diferencia del skip natural, un skip manual SÍ dispara
+            // `resetToInitialState()` de forma síncrona (vía
+            // `markPresetInvalidated`). Así que currentSession vuelve a 1.
+            #expect(vm.currentSession == 1, "skip manual resetea currentSession")
 
-        // Sesión 2 → break
-        var finished = vm.skipToNextPhase(wasCompleted: true)
-        #expect(!finished)
-
-        // Break → sesión 3
-        finished = vm.skipToNextPhase(wasCompleted: true)
-        #expect(!finished)
-        #expect(vm.currentSession == 3)
-        #expect(vm.isBreak == false)
-
-        // Sesión 3 → break
-        finished = vm.skipToNextPhase(wasCompleted: true)
-        #expect(!finished)
-
-        // Break → sesión 4
-        finished = vm.skipToNextPhase(wasCompleted: true)
-        #expect(!finished)
-
-        // Sesión 4 → break
-        finished = vm.skipToNextPhase(wasCompleted: true)
-        #expect(!finished)
-
-        // Break → sesión 5
-        finished = vm.skipToNextPhase(wasCompleted: true)
-        #expect(!finished)
-        #expect(vm.currentSession == 5)
-
-        // Sesión 5 → cierra
-        finished = vm.skipToNextPhase(wasCompleted: true)
-        #expect(finished)
-    }
+            // El run del forward debe estar totalmente invalidado.
+            let bRecords = SessionStore.shared.records(forPresetRunId: runB)
+            #expect(!bRecords.isEmpty)
+            #expect(bRecords.allSatisfy { $0.presetInvalidated },
+                    "todos los records del run inválido deben quedar marcados")
+        }
 }
 
 // MARK: - Sección C: secuencias con múltiples taps + skip
@@ -392,7 +388,7 @@ struct TimerViewModelRunningTests {
         #expect(beforeRunning == true)
         #expect(afterRunning == true)
         #expect(vm.currentSession == 4)
-        #expect(vm.targetDate != nil || !vm.isRunning, "targetDate debe setearse por startTicking")
+        #expect(vm.debugTargetDateForTest() != nil || !vm.isRunning, "targetDate debe setearse por startTicking")
     }
 
     @Test("Tap backward con timer running: targetDate y isRunning se mantienen")

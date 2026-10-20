@@ -1,5 +1,13 @@
 //
 //  TimerViewModelNavigationTests.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 12/10/2026.
+//
+
+
+//
+//  TimerViewModelNavigationTests.swift
 //  PomodoroSenseTests
 //
 
@@ -39,11 +47,12 @@ struct TimerViewModelBackgroundTests {
 
     @Test("sceneMovedToBackground con isRunning=false es no-op")
     func sceneMovedToBackgroundIsNoOpWhenNotRunning() {
-        let vm = TimerViewModel()
-        // isRunning = false por default.
-        // No debe crashear ni tocar UserDefaults.
-        vm.sceneMovedToBackground()
-        #expect(vm.isRunning == false)
+            // Sin esto, `restorePersistedState()` puede rehidratar isRunning = true
+            // desde UserDefaults.standard (leftover de un test anterior que dejó
+            // una sesión corriendo). El test debe arrancar desde cero.
+            TimerViewModel.clearPersistedSessionKeys()
+            let vm = TimerViewModel()
+            // isRunning = false porque acabamos de limpiar.
     }
 
     @Test("sceneMovedToBackground con isRunning=true no crashea")

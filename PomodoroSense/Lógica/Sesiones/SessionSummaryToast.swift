@@ -1,3 +1,11 @@
+//
+//  SessionSummaryToast.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 09/10/2026.
+//
+
+
 import SwiftUI
 
 struct SessionSummaryToast: View {

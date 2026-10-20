@@ -1,3 +1,11 @@
+//
+//  QRCodeView.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 15/10/2026.
+//
+
+
 import SwiftUI
 import CoreImage.CIFilterBuiltins
 

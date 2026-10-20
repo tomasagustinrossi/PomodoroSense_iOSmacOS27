@@ -1,4 +1,12 @@
 //
+//  HIGMotion.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 17/10/2026.
+//
+
+
+//
 //  HIGDesign.swift
 //  PomodoroSense
 //
@@ -62,5 +70,25 @@ struct HIGScrim: View {
         .ignoresSafeArea()
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
+    }
+}
+
+// MARK: - Radios (siempre con `style: .continuous`)
+
+enum HIGRadius {
+    /// Chips, campos y botones chicos.
+    static let control: CGFloat = 10
+    /// Tarjetas y filas agrupadas.
+    static let card: CGFloat = 16
+    /// Popups y sheets.
+    static let popup: CGFloat = 24
+}
+
+// MARK: - Transiciones
+
+extension AnyTransition {
+    /// Entrada/salida estándar de popups: escala suave + fade.
+    static var higPopup: AnyTransition {
+        .scale(scale: 0.95).combined(with: .opacity)
     }
 }

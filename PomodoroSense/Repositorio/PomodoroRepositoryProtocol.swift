@@ -1,3 +1,11 @@
+//
+//  PomodoroRepositoryProtocol.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 06/10/2026.
+//
+
+
 import Foundation
 
 // 1. El Contrato (Inversión de Control)
@@ -10,20 +18,31 @@ protocol PomodoroRepositoryProtocol {
 class UserDefaultsPomodoroRepository: PomodoroRepositoryProtocol {
     private let storageKey = "Pomodoro_Saved_Presets"
     
-    // Si queremos cambiar a SwiftData mañana, solo creamos una clase nueva que firme el protocolo
-    // y el resto de la app ni se entera.
-    
     func loadConfigs() -> [PomodoroConfigDTO] {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let decoded = try? JSONDecoder().decode([PomodoroConfigDTO].self, from: data) else {
+        guard let data = UserDefaults.standard.data(forKey: storageKey) else {
+            print("💾 [Repo] 0 bytes encontrados (Primer inicio).")
             return []
         }
-        return decoded
+        
+        do {
+            let decoded = try JSONDecoder().decode([PomodoroConfigDTO].self, from: data)
+            print("💾 [Repo] CARGA EXITOSA: \(decoded.count) presets leídos.")
+            return decoded
+        } catch {
+            // AQUÍ SALTARÁ EL ERROR SI TUS DTOs NO SON 100% CODABLE
+            print("🚨 [Repo ERROR CRÍTICO DE LECTURA]: \(error)")
+            return []
+        }
     }
     
     func saveConfigs(_ configs: [PomodoroConfigDTO]) {
-        if let encoded = try? JSONEncoder().encode(configs) {
+        do {
+            let encoded = try JSONEncoder().encode(configs)
             UserDefaults.standard.set(encoded, forKey: storageKey)
+            print("💾 [Repo] GUARDADO EXITOSO: \(configs.count) presets escritos en disco.")
+        } catch {
+            // AQUÍ SALTARÁ EL ERROR SI HAY ALGÚN TIPO INCOMPATIBLE EN TUS STRUCTS
+            print("🚨 [Repo ERROR CRÍTICO DE ESCRITURA]: \(error)")
         }
     }
 }

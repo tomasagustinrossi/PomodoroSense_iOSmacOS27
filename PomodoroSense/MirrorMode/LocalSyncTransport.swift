@@ -2,69 +2,167 @@
 //  LocalSyncTransport.swift
 //  PomodoroSense
 //
-//  Created by Tomas Rossi on 15/10/2026.
-//
-
 
 import Foundation
 import Network
+import Security
 import CryptoKit
 
-/// Define la configuración de seguridad y transporte para la red P2P local.
 enum LocalSyncTransport {
-    
-    /// El identificador del servicio Bonjour. Debe coincidir exactamente en ambos dispositivos.
+
     static let serviceType = "_pomodorosense._tcp"
-    
-    /// Genera los parámetros de red con TLS 1.3 y PSK (Pre-Shared Key) obligatorio.
-    /// - Parameter passcode: El código de emparejamiento acordado entre los dispositivos.
-    static func secureParameters(passcode: String) -> NWParameters {
+
+    /// Alfabeto del pairing code: sin 0/O/1/I/L para evitar confusión
+    /// al copiar/pegar a mano.
+    static let pairingAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+    /// 16 chars de un alfabeto de 31 → ~79 bits de entropía.
+    /// Formateado como XXXX-XXXX-XXXX-XXXX.
+    static let pairingCodeLength = 16
+
+    private static let pskIdentity = Data("PomodoroSense_PSK".utf8)
+    private static let keychainService = "com.tomiirossi.PomodoroSense.localsync"
+    private static let keychainAccount = "pairing-key"
+
+    enum TransportError: Error {
+        case keychain(OSStatus)
+        case invalidPairingCode
+        case randomGenerationFailed
+    }
+
+    // MARK: - Generación / canonicalización
+
+    /// Genera un pairing code nuevo (solo lo usa el Master al iniciar
+    /// una sesión de "SHARE THIS TIMER").
+    static func generatePairingCode() throws -> String {
+        var bytes = [UInt8](repeating: 0, count: pairingCodeLength)
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        guard status == errSecSuccess else {
+            throw TransportError.randomGenerationFailed
+        }
+        let alphabet = Array(pairingAlphabet)
+        let chars = bytes.map { alphabet[Int($0) % alphabet.count] }
+        return format(String(chars))
+    }
+
+    /// Canonicaliza un código pegado por el usuario.
+    /// Acepta con o sin guiones, mayúsculas o minúsculas.
+    /// Devuelve `nil` si el resultado no tiene 16 chars válidos.
+    static func canonicalize(_ raw: String) -> String? {
+        let upper = raw.uppercased(with: Locale(identifier: "en_US_POSIX"))
+        let allowed = Set(pairingAlphabet)
+        let filtered = upper.filter { allowed.contains($0) }
+        guard filtered.count == pairingCodeLength else { return nil }
+        return String(filtered)
+    }
+
+    private static func format(_ raw: String) -> String {
+        var out = ""
+        for (i, ch) in raw.enumerated() {
+            if i > 0 && i % 4 == 0 { out.append("-") }
+            out.append(ch)
+        }
+        return out
+    }
+
+    // MARK: - Derivación de PSK
+
+    /// Deriva la PSK desde el código YA canonicalizado (16 chars sin guiones).
+    /// 10.000 iteraciones de SHA256 para encarecer el brute force offline
+    /// (el código viaja por QR o por portapapeles, no es secreto per se).
+    static func derivePSK(fromCanonical canonical: String) -> SymmetricKey {
+        var current = Data(canonical.utf8)
+        for _ in 0..<10_000 {
+            current = Data(SHA256.hash(data: current))
+        }
+        // Log temporal para verificar que la clave es la misma en ambos dispositivos.
+        #if DEBUG
+        let hash = SHA256.hash(data: current)
+        let hex = hash.prefix(8).map { String(format: "%02x", $0) }.joined()
+        print("🔑 [Transport] PSK derivada (fingerprint): \(hex)")
+        #endif
+        return SymmetricKey(data: current)
+    }
+
+    /// Punto único de entrada: toma un código crudo (con o sin guiones,
+    /// como lo escriba el usuario o lo lea el QR), lo canonicaliza, y
+    /// devuelve la PSK. Lanza si el código es inválido.
+    static func derivePSK(fromRaw raw: String) throws -> SymmetricKey {
+        guard let canonical = canonicalize(raw) else {
+            throw TransportError.invalidPairingCode
+        }
+        return derivePSK(fromCanonical: canonical)
+    }
+
+    // MARK: - Parámetros de red
+
+    static func secureParameters(key: SymmetricKey) -> NWParameters {
         let tcpOptions = NWProtocolTCP.Options()
         tcpOptions.enableKeepalive = true
-        tcpOptions.keepaliveIdle = 2 // Detecta caídas de red rápidamente
-        
+        tcpOptions.keepaliveIdle = 10
+        tcpOptions.keepaliveInterval = 5
+        tcpOptions.keepaliveCount = 3
+
         let tlsOptions = NWProtocolTLS.Options()
-        
-        // 1. Derivar una clave criptográfica fuerte a partir del passcode del usuario
-        let psk = deriveKey(from: passcode)
-        
-        // 2. Configurar el Pre-Shared Key en las opciones de TLS de bajo nivel (sec_protocol)
-        sec_protocol_options_add_pre_shared_key(
-            tlsOptions.securityProtocolOptions,
-            DispatchData(data: psk) as __DispatchData,
-            DispatchData(data: Data("PomodoroSense_PSK".utf8)) as __DispatchData
-        )
-        
-        // 3. Forzar TLS 1.3 para máxima seguridad y eficiencia con PSK
-        sec_protocol_options_append_tls_ciphersuite(
-            tlsOptions.securityProtocolOptions,
-            tls_ciphersuite_t(rawValue: TLS_AES_128_GCM_SHA256)!
-        )
-        sec_protocol_options_set_min_tls_protocol_version(tlsOptions.securityProtocolOptions, .TLSv13)
-        
-        // 4. Crear los parámetros combinando TLS y TCP
+        let secOptions = tlsOptions.securityProtocolOptions
+
+        let pskData = key.withUnsafeBytes { DispatchData(bytes: $0) as __DispatchData }
+        let identityData = pskIdentity.withUnsafeBytes { DispatchData(bytes: $0) as __DispatchData }
+        sec_protocol_options_add_pre_shared_key(secOptions, pskData, identityData)
+
+        // ✅ Cifrado correcto para PSK
+        if let suite = tls_ciphersuite_t(rawValue: UInt16(TLS_PSK_WITH_AES_128_GCM_SHA256)) {
+            sec_protocol_options_append_tls_ciphersuite(secOptions, suite)
+        }
+        // En lugar de .TLSv13, probá con .TLSv12
+        sec_protocol_options_set_min_tls_protocol_version(secOptions, .TLSv12)
+
         let parameters = NWParameters(tls: tlsOptions, tcp: tcpOptions)
-        
-        // Habilitamos soporte para redes locales peer-to-peer
         parameters.includePeerToPeer = true
-        
         return parameters
     }
-    
-    /// Expande un simple código de texto en una clave simétrica robusta de 256 bits usando HKDF.
-    private static func deriveKey(from passcode: String) -> Data {
-        let inputKeyMaterial = SymmetricKey(data: Data(passcode.utf8))
-        // El 'salt' añade entropía estática, y el 'info' vincula la clave a este contexto específico.
-        let salt = Data("PomodoroSense_Salt_v1".utf8)
-        let info = Data("PomodoroSense_TLS_Key".utf8)
-        
-        let derivedKey = HKDF<SHA256>.deriveKey(
-            inputKeyMaterial: inputKeyMaterial,
-            salt: salt,
-            info: info,
-            outputByteCount: 32 // 256 bits
-        )
-        
-        return derivedKey.withUnsafeBytes { Data($0) }
+
+    // MARK: - Persistencia de PSK (Keychain)
+
+    static func savePSK(_ key: SymmetricKey) throws {
+        let data = key.withUnsafeBytes { Data($0) }
+        SecItemDelete(baseQuery() as CFDictionary)
+
+        var attributes = baseQuery()
+        attributes[kSecValueData as String] = data
+        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+
+        let status = SecItemAdd(attributes as CFDictionary, nil)
+        guard status == errSecSuccess else { throw TransportError.keychain(status) }
+    }
+
+    static func loadPSK() throws -> SymmetricKey? {
+        var query = baseQuery()
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        switch status {
+        case errSecSuccess:
+            guard let data = item as? Data else { return nil }
+            return SymmetricKey(data: data)
+        case errSecItemNotFound:
+            return nil
+        default:
+            throw TransportError.keychain(status)
+        }
+    }
+
+    static func resetPairing() {
+        SecItemDelete(baseQuery() as CFDictionary)
+    }
+
+    private static func baseQuery() -> [String: Any] {
+        [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount
+        ]
     }
 }

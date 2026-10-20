@@ -2,20 +2,13 @@
 //  MetalStyle.swift
 //  PomodoroSense
 //
-//  Created by Tomas Rossi on 18/10/2026.
-//
-
-
-//
-//  MetalStyle.swift
-//  PomodoroSense
-//
 //  Un "estilo de metal" por sección (bronze / silver / gold).
 //  Agregar una sección nueva = agregar un case en ShopCategory + un MetalStyle acá.
 //
 
 import SceneKit
 import CoreGraphics
+import SwiftUI
 
 struct MetalStyle: Hashable {
     let r: Double, g: Double, b: Double
@@ -37,6 +30,15 @@ struct MetalStyle: Hashable {
         m.isDoubleSided = false
         return m
     }
+}
+
+// Colores 2D derivados del mismo metal (para la vista plana de la tienda)
+extension MetalStyle {
+    var baseColor: Color  { Color(red: r, green: g, blue: b) }
+    var shineColor: Color { Color(red: r + (1 - r) * 0.75, green: g + (1 - g) * 0.75, blue: b + (1 - b) * 0.75) }
+    var lightColor: Color { Color(red: r + (1 - r) * 0.40, green: g + (1 - g) * 0.40, blue: b + (1 - b) * 0.40) }
+    var midDarkColor: Color { Color(red: r * 0.72, green: g * 0.72, blue: b * 0.72) }
+    var darkColor: Color  { Color(red: r * 0.40, green: g * 0.40, blue: b * 0.40) }
 }
 
 extension ShopCategory {

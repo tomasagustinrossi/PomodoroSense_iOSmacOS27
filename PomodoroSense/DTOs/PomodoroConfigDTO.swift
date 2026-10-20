@@ -1,3 +1,11 @@
+//
+//  PomodoroConfigDTO.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 06/10/2026.
+//
+
+
 import Foundation
 
 // Único contrato para la base de datos local y la memoria de la UI

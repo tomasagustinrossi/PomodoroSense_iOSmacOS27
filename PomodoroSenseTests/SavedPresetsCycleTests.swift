@@ -41,7 +41,7 @@ struct SavedPresetsCycleTests {
     func backwardCycle() {
         var current: SavedPresetsFocus? = .presetList
         current = SavedPresetsKeyboard.cycle(from: current, forward: false)
-        #expect(current == .navPlus, "Desde el primero va al último")
+        #expect(current == .navPlus)
         current = SavedPresetsKeyboard.cycle(from: current, forward: false)
         #expect(current == .navSync)
     }
@@ -50,7 +50,7 @@ struct SavedPresetsCycleTests {
     func everyZoneHasNext() {
         for zone in SavedPresetsFocus.cycleOrder {
             let next = SavedPresetsKeyboard.cycle(from: zone, forward: true)
-            #expect(next != zone, "El ciclo desde \(zone) no puede devolver lo mismo")
+            #expect(next != zone)
         }
     }
 }
@@ -84,20 +84,15 @@ struct SavedPresetsSpaceTests {
     func activeTimerAlwaysToggles() {
         for zone in SavedPresetsFocus.cycleOrder {
             let action = SavedPresetsKeyboard.spaceAction(
-                isTimerActive: true,
-                focusedZone: zone
-            )
-            #expect(action == .toggleTimer,
-                    "Con timer activo y foco en \(zone), debe togglear")
+                isTimerActive: true, focusedZone: zone)
+            #expect(action == .toggleTimer)
         }
     }
 
     @Test("Sin timer, Space en la lista arranca el preset")
     func idleSpaceOnListStartsPreset() {
         let action = SavedPresetsKeyboard.spaceAction(
-            isTimerActive: false,
-            focusedZone: .presetList
-        )
+            isTimerActive: false, focusedZone: .presetList)
         #expect(action == .startSelectedPreset)
     }
 
@@ -105,11 +100,8 @@ struct SavedPresetsSpaceTests {
     func idleSpaceOnNavbarDoesNothing() {
         for zone in [SavedPresetsFocus.navSearch, .navStats, .navSync, .navPlus] {
             let action = SavedPresetsKeyboard.spaceAction(
-                isTimerActive: false,
-                focusedZone: zone
-            )
-            #expect(action == .none,
-                    "Sin timer y foco en \(zone), Space debe ser no-op")
+                isTimerActive: false, focusedZone: zone)
+            #expect(action == .none)
         }
     }
 }
@@ -163,11 +155,10 @@ struct SavedPresetsMoveTests {
     func outOfRangeTreatedAsNil() {
         let forward = SavedPresetsKeyboard.movePresetIndex(
             currentIndex: 99, count: 3, offset: 1)
-        #expect(forward == 0, "99 no es válido: se comporta como nil (arranca en 0)")
-
+        #expect(forward == 0)
         let backward = SavedPresetsKeyboard.movePresetIndex(
             currentIndex: 99, count: 3, offset: -1)
-        #expect(backward == 2, "99 no es válido con -1: arranca en el último")
+        #expect(backward == 2)
     }
 
     @Test("Ciclo completo con count 5")
@@ -177,6 +168,6 @@ struct SavedPresetsMoveTests {
             idx = SavedPresetsKeyboard.movePresetIndex(
                 currentIndex: idx, count: 5, offset: 1)
         }
-        #expect(idx == 0, "Después de 5 saltos vuelve al inicio")
+        #expect(idx == 0)
     }
 }

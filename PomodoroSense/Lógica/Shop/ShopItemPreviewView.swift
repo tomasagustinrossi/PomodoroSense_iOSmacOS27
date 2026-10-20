@@ -2,15 +2,8 @@
 //  ShopItemPreviewView.swift
 //  PomodoroSense
 //
-//  Created by Tomas Rossi on 18/10/2026.
-//
-
-
-//
-//  ShopItemPreviewView.swift
-//  PomodoroSense
-//
-//  Misma firma que antes: ShopView y OwnedItemsView no necesitan cambios.
+//  `flat: true` -> icono 2D con el metal de la sección (grids, listas).
+//  `flat: false` -> 3D rotable (popup de detalle, vitrina).
 //
 
 import SwiftUI
@@ -22,14 +15,25 @@ struct ShopItemPreviewView: View {
     var tint: Color = .white        // compatibilidad (el color ahora lo define la sección)
     var depth: CGFloat = 24         // compatibilidad (el grosor va en el visual)
     var interactive: Bool = true
+    var flat: Bool = false          // true = versión 2D
+    var dimmed: Bool = false        // true = atenuado (p. ej. ya comprado)
+    var straight: Bool = false
 
     var body: some View {
-        Model3DView(
-            visual: item.visual,
-            category: item.category,
-            size: size,
-            autoRotate: autoRotate,
-            interactive: interactive
-        )
+            Group {
+                if flat {
+                    FlatIconView(visual: item.visual, category: item.category, size: size)
+                } else {
+                    Model3DView(
+                        visual: item.visual,
+                        category: item.category,
+                        size: size,
+                        autoRotate: autoRotate,
+                        interactive: interactive,
+                        straight: straight // <-- PASAR ACÁ
+                    )
+                }
+            }
+        .opacity(dimmed ? 0.5 : 1)
     }
 }

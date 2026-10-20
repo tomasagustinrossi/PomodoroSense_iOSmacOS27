@@ -2,6 +2,14 @@
 //  MacDockTileController.swift
 //  PomodoroSense
 //
+//  Created by Tomas Rossi on 13/10/2026.
+//
+
+
+//
+//  MacDockTileController.swift
+//  PomodoroSense
+//
 //  Anima el icono del Dock en macOS:
 //  - Anillo de progreso que rodea el icono durante una sesión.
 //  - Color según fase (FOCUS = workAccent, BREAK = breakAccent).
@@ -72,21 +80,9 @@ final class MacDockTileController {
     // MARK: - Dock
 
     private func updateDock() {
-        guard let vm = timerVM else { return }
-
-        if vm.isActive {
-            installDockViewIfNeeded()
-            let theme = vm.currentTheme
-            let accent = vm.isBreak ? theme.breakAccent : theme.workAccent
-
-            dockView?.ringColor = NSColor(accent)
-            dockView?.progress = vm.progress
-            dockView?.isRunning = vm.isRunning
-            dockView?.needsDisplay = true
-            NSApp.dockTile.display()
-        } else {
-            uninstallDockView()
-        }
+        // Anillo desactivado: solo mantenemos el bounce al cambiar de fase.
+        // El anillo quedó mal visualmente y se decidió sacarlo.
+        uninstallDockView()
     }
 
     private func installDockViewIfNeeded() {
@@ -114,7 +110,7 @@ final class MacDockTileController {
         if vm.isActive {
             guard updateTimer == nil else { return }
             let t = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     self?.updateDock()
                 }
             }
@@ -172,13 +168,17 @@ final class DockProgressView: NSView {
     private func drawProgressRing() {
         guard progress > 0 || !isRunning else { return }
 
-        let inset: CGFloat = 2
+        // Valores calibrados para que el anillo caiga ENCIMA del aro del
+        // icono (que ocupa ~88% del ancho). Si necesitás moverlo, ajustá
+        // el `inset` y el `lineWidth`.
+        let inset: CGFloat = 9
+        let lineWidth: CGFloat = 13
         let ringRect = bounds.insetBy(dx: inset, dy: inset)
-        let lineWidth: CGFloat = 7
         let center = NSPoint(x: bounds.midX, y: bounds.midY)
         let radius = (ringRect.width - lineWidth) / 2
 
-        // Fondo del anillo (tenue, siempre visible cuando hay sesión).
+        // Fondo del anillo: tapamos el aro original del icono con un gris
+        // muy tenue para que se lea "vacío".
         let backgroundPath = NSBezierPath()
         backgroundPath.appendArc(
             withCenter: center,
@@ -187,11 +187,11 @@ final class DockProgressView: NSView {
             endAngle: 360
         )
         backgroundPath.lineWidth = lineWidth
-        NSColor.black.withAlphaComponent(0.35).setStroke()
+        NSColor.black.withAlphaComponent(0.55).setStroke()
         backgroundPath.stroke()
 
         // Anillo de progreso. Si está pausado, usamos opacidad reducida.
-        let alpha: CGFloat = isRunning ? 1.0 : 0.5
+        let alpha: CGFloat = isRunning ? 1.0 : 0.55
         let arc = NSBezierPath()
         let startAngle: CGFloat = 90                  // top
         let endAngle: CGFloat = 90 - (360 * progress) // clockwise

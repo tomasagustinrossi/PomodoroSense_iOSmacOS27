@@ -1,3 +1,11 @@
+//
+//  JackpotPanel.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 09/10/2026.
+//
+
+
 import SwiftUI
 
 /// Panel de JACKPOT para el widget (Lock Screen + Dynamic Island).

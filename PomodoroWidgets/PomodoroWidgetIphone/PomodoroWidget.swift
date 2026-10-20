@@ -56,7 +56,7 @@ struct PomodoroWidgetEntryView : View {
 }
 
 struct PomodoroWidget: Widget {
-    let kind: String = "PomodoroWidget"
+    let kind: String = "PomodoroMacWidget"
 
     var body: some WidgetConfiguration {
         AppIntentConfiguration(kind: kind, intent: ConfigurationAppIntent.self, provider: Provider()) { entry in

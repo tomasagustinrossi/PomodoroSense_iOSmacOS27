@@ -1,4 +1,12 @@
 //
+//  HapticStyle.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 17/10/2026.
+//
+
+
+//
 //  Haptics.swift
 //  PomodoroSense
 //

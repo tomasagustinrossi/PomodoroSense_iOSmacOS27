@@ -18,6 +18,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "668E84C130757D3900C0779F"
                BuildableName = "PomodoroWidgetExtension.appex"
+               BlueprintName = "PomodoroWidgetExtension"
                ReferencedContainer = "container:PomodoroSense.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -31,6 +32,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "661B064C3072DF53000890AC"
                BuildableName = "PomodoroSense.app"
+               BlueprintName = "PomodoroSense"
                ReferencedContainer = "container:PomodoroSense.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -42,6 +44,18 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "6654A5A5307D670100E391C3"
+               BuildableName = "PomodoroSenseTests.xctest"
+               ReferencedContainer = "container:PomodoroSense.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
@@ -64,6 +78,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "668E84C130757D3900C0779F"
             BuildableName = "PomodoroWidgetExtension.appex"
+            BlueprintName = "PomodoroWidgetExtension"
             ReferencedContainer = "container:PomodoroSense.xcodeproj">
          </BuildableReference>
       </RemoteRunnable>
@@ -72,6 +87,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "661B064C3072DF53000890AC"
             BuildableName = "PomodoroSense.app"
+            BlueprintName = "PomodoroSense"
             ReferencedContainer = "container:PomodoroSense.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -107,6 +123,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "661B064C3072DF53000890AC"
             BuildableName = "PomodoroSense.app"
+            BlueprintName = "PomodoroSense"
             ReferencedContainer = "container:PomodoroSense.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

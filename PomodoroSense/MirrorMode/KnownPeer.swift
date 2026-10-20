@@ -2,6 +2,14 @@
 //  KnownPeer.swift
 //  PomodoroSense
 //
+//  Created by Tomas Rossi on 15/10/2026.
+//
+
+
+//
+//  KnownPeer.swift
+//  PomodoroSense
+//
 
 import Foundation
 

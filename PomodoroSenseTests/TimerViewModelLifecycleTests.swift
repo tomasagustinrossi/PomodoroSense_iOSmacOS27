@@ -1,5 +1,13 @@
 //
 //  TimerViewModelLifecycleTests.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 13/10/2026.
+//
+
+
+//
+//  TimerViewModelLifecycleTests.swift
 //  PomodoroSenseTests
 //
 
@@ -10,11 +18,27 @@ import Foundation
 @Suite("TimerViewModel — ciclo de vida")
 @MainActor
 struct TimerViewModelLifecycleTests {
+    
+    /// Limpia las keys de sesión de UserDefaults antes de crear un VM.
+    /// Necesario porque `TimerViewModel.init()` restaura el estado desde
+    /// UserDefaults, y otros tests pueden haber dejado basura.
+    private func cleanSessionDefaults() {
+        let keys = [
+            "session_isRunning",
+            "session_isBreak",
+            "session_currentSession",
+            "session_targetDate",
+            "session_noiseId",
+            "session_config",
+            "session_secondsRemaining",
+            "session_lastSaveTimestamp"
+        ]
+        keys.forEach { UserDefaults.standard.removeObject(forKey: $0) }
+    }
 
     @Test("sceneMovedToBackground no crashea en idle")
     func backgroundIdleIsSafe() {
-        UserDefaults.standard.removeObject(forKey: "session_isRunning")
-        UserDefaults.standard.removeObject(forKey: "session_lastSaveTimestamp")
+        cleanSessionDefaults()
 
         let vm = TimerViewModel()
         vm.sceneMovedToBackground()

@@ -1,3 +1,11 @@
+//
+//  MenuBarFreeModeView.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 17/10/2026.
+//
+
+
 #if os(macOS)
 import SwiftUI
 

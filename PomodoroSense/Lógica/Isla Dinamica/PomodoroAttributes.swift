@@ -5,24 +5,45 @@
 //  Created by Tomas Rossi on 06/10/2026.
 //
 
-
 import Foundation
 import SwiftUI
+
+/// Payload del reward al terminar una sesión. Viaja dentro de `ContentState`
+/// para que el widget lo muestre sin cálculos propios.
+nonisolated struct SessionRewardPayload: Codable, Hashable {
+    var chipsEarned: Int          // chips ganados por ESTA sesión
+    var totalChipsToday: Int      // acumulado del día incluyendo esta
+    var newStreak: Int            // racha resultante
+    var isLucky: Bool             // si esta sesión fue "lucky"
+    var isLastSession: Bool       // si fue la última del preset
+    var isJackpot: Bool           // máxima recompensa alcanzada
+    // ─── NUEVO: breakdown por tier ───
+    var bronzeEarned: Int
+    var silverEarned: Int
+    var goldEarned: Int
+    var newlyUnlockedTier: CurrencyTier?   // si esta sesión desbloqueó un tier nuevo
+
+    var generatedAt: Date   // para auto-expirar el panel
+
+        /// Total de currency ganada (todos los tiers).
+    var totalEarned: Int { bronzeEarned + silverEarned + goldEarned }
+}
+
 #if os(iOS)
 import ActivityKit
 
-// Define los datos estáticos y dinámicos para la Dynamic Island y Lockscreen
-struct PomodoroAttributes: ActivityAttributes {
+nonisolated struct PomodoroAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
-        // Datos que cambian segundo a segundo
         var isBreak: Bool
         var currentSession: Int
         var totalSessions: Int
-        var targetDate: Date // Fundamental: iOS calcula el tiempo visualmente usando la fecha final
-        var noiseId: Int // NUEVO: Llave para que el widget instancie su propia paleta
+        var targetDate: Date
+        var noiseId: Int
+        public var isRunning: Bool
+        var pausedSeconds: Int?
+        var reward: SessionRewardPayload?
+        var isFreeMode: Bool = false // <-- ÚNICO AGREGADO
     }
-
-    // Datos estáticos (ej: nombre de la configuración)
     var presetName: String
 }
 #endif

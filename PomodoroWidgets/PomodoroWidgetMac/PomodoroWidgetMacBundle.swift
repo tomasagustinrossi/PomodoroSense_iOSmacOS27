@@ -1,17 +1,14 @@
 //
-//  PomodoroWidgetMacBundle.swift
-//  PomodoroWidgetMac
-//
-//  Created by Tomas Rossi on 12/10/2026.
+//  PomodoroMacWidgetBundle.swift
+//  PomodoroMacWidget
 //
 
 import WidgetKit
 import SwiftUI
 
 @main
-struct PomodoroWidgetMacBundle: WidgetBundle {
+struct PomodoroMacWidgetBundle: WidgetBundle {
     var body: some Widget {
-        PomodoroWidgetMac()
-        PomodoroWidgetMacControl()
+        PomodoroMacWidget()
     }
 }

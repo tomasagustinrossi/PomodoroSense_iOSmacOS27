@@ -61,7 +61,75 @@ struct SessionStoreLoadTests {
         #expect(store.wallet.bronze == 42)
         #expect(store.wallet.silver == 7)
     }
+    
+    @Test("Sesión salteada no se duplica si se registra como interrumpida después")
+    func skippedSessionIsNotDuplicated() {
+        let (defaults, suite) = makeIsolatedDefaults()
+        defer { cleanupDefaults(suiteName: suite) }
+
+        let store = SessionStore(defaults: defaults)
+
+        // 1) Salteo la sesión 3
+        store.recordSkippedSession(
+            presetName: "TEST",
+            focusMinutes: 30,
+            sessionNumber: 3,
+            totalSessions: 5
+        )
+
+        // 2) Verifico que existe exactamente 1 record para esa sesión
+        let countBefore = store.records.filter {
+            $0.presetName == "TEST" && $0.sessionNumber == 3
+        }.count
+        #expect(countBefore == 1)
+
+        // 3) Simulo que la app detecta "app muerta" sin saber que
+        //    ya fue salteada. El guard debería evitar el duplicado.
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let alreadyRecorded = store.records.contains { record in
+            cal.isDate(record.dayStart, inSameDayAs: today)
+                && record.presetName == "TEST"
+                && record.sessionNumber == 3
+        }
+        #expect(alreadyRecorded == true, "El guard debe detectar que ya existe")
+
+        // 4) No llamamos recordInterruptedSession → no hay duplicado
+        let countAfter = store.records.filter {
+            $0.presetName == "TEST" && $0.sessionNumber == 3
+        }.count
+        #expect(countAfter == 1, "No debe duplicar la entrada")
+    }
+
+    @Test("Sesiones en distintos presets no se pisan aunque tengan el mismo número")
+    func sameSessionNumberDifferentPresetsAreDistinct() {
+        let (defaults, suite) = makeIsolatedDefaults()
+        defer { cleanupDefaults(suiteName: suite) }
+
+        let store = SessionStore(defaults: defaults)
+
+        store.recordSkippedSession(
+            presetName: "PRESET_A",
+            focusMinutes: 30, sessionNumber: 3, totalSessions: 5
+        )
+        store.recordSkippedSession(
+            presetName: "PRESET_B",
+            focusMinutes: 30, sessionNumber: 3, totalSessions: 5
+        )
+
+        let countA = store.records.filter {
+            $0.presetName == "PRESET_A" && $0.sessionNumber == 3
+        }.count
+        let countB = store.records.filter {
+            $0.presetName == "PRESET_B" && $0.sessionNumber == 3
+        }.count
+
+        #expect(countA == 1)
+        #expect(countB == 1, "El match debe incluir presetName, no solo sessionNumber")
+    }
 }
+
+
 
 @Suite("SessionStore — registro de sesiones")
 @MainActor
@@ -235,5 +303,114 @@ struct SessionStoreCreditTests {
         let earned = store.creditSession([.bronze: 10], streakDays: 1)
 
         #expect(earned.isEmpty, "No debe haber tiers acreditados")
+    }
+    
+    @Suite("SessionStore — recordCompletedSession devuelve el record")
+    @MainActor
+    struct SessionStoreRecordReturnTests {
+
+        @Test("recordCompletedSession retorna el record creado")
+        func recordCompletedSessionReturnsRecord() {
+            let (defaults, suite) = makeIsolatedDefaults()
+            defer { cleanupDefaults(suiteName: suite) }
+
+            let store = SessionStore(defaults: defaults)
+            let returned = store.recordCompletedSession(
+                presetName: "TEST",
+                focusMinutes: 45,
+                sessionNumber: 2,
+                totalSessions: 5
+            )
+
+            #expect(returned.presetName == "TEST")
+            #expect(returned.focusMinutes == 45)
+            #expect(returned.sessionNumber == 2)
+            #expect(returned.totalSessions == 5)
+            #expect(returned.wasSkipped == false)
+            #expect(returned.wasInterrupted == false)
+            #expect(returned.qualifiesForChips == true)
+            #expect(store.records.count == 1, "El record debe estar en el store")
+            #expect(store.records[0].id == returned.id, "Debe ser el mismo record")
+        }
+
+        @Test("El record devuelto se puede usar para acreditar chips")
+        func returnedRecordCanBeCredited() {
+            let (defaults, suite) = makeIsolatedDefaults()
+            defer { cleanupDefaults(suiteName: suite) }
+
+            let store = SessionStore(defaults: defaults)
+            let record = store.recordCompletedSession(
+                presetName: "TEST",
+                focusMinutes: 60,
+                sessionNumber: 1,
+                totalSessions: 5
+            )
+
+            // Simula lo que hace TimerViewModel.creditChipsSilently
+            let earnings = ScoreCalculator.tierEarnings(
+                for: record,
+                streakDays: 1,
+                wallet: store.wallet
+            )
+            let credited = store.creditSession(earnings, streakDays: 1)
+
+            #expect((credited[.bronze] ?? 0) > 0, "Debe haber acreditado bronze")
+            #expect(store.wallet.bronze > 0)
+        }
+    }
+    @Suite("SessionStore — totalFocusMinutes excluye interrumpidas")
+    @MainActor
+    struct SessionStoreFocusMinutesTests {
+
+        @Test("Sesiones completadas sí cuentan")
+        func completedSessionsCount() {
+            let (defaults, suite) = makeIsolatedDefaults()
+            defer { cleanupDefaults(suiteName: suite) }
+
+            let store = SessionStore(defaults: defaults)
+            store.recordCompletedSession(presetName: "T", focusMinutes: 30, sessionNumber: 1, totalSessions: 5)
+            store.recordCompletedSession(presetName: "T", focusMinutes: 45, sessionNumber: 2, totalSessions: 5)
+
+            #expect(store.totalFocusMinutes(on: Date()) == 75)
+        }
+
+        @Test("Sesiones salteadas no cuentan")
+        func skippedSessionsDontCount() {
+            let (defaults, suite) = makeIsolatedDefaults()
+            defer { cleanupDefaults(suiteName: suite) }
+
+            let store = SessionStore(defaults: defaults)
+            store.recordCompletedSession(presetName: "T", focusMinutes: 30, sessionNumber: 1, totalSessions: 5)
+            store.recordSkippedSession(presetName: "T", focusMinutes: 30, sessionNumber: 2, totalSessions: 5)
+
+            #expect(store.totalFocusMinutes(on: Date()) == 30)
+        }
+
+        @Test("Sesiones interrumpidas no cuentan")
+        func interruptedSessionsDontCount() {
+            let (defaults, suite) = makeIsolatedDefaults()
+            defer { cleanupDefaults(suiteName: suite) }
+
+            let store = SessionStore(defaults: defaults)
+            store.recordCompletedSession(presetName: "T", focusMinutes: 30, sessionNumber: 1, totalSessions: 5)
+            store.recordInterruptedSession(presetName: "T", focusMinutes: 60, sessionNumber: 2, totalSessions: 5)
+
+            #expect(store.totalFocusMinutes(on: Date()) == 30,
+                    "La interrumpida no debe sumar sus 60 min")
+        }
+
+        @Test("El día sigue marcado como 'con actividad' aunque solo haya interrumpidas")
+        func interruptedSessionsStillMarkDayAsActive() {
+            let (defaults, suite) = makeIsolatedDefaults()
+            defer { cleanupDefaults(suiteName: suite) }
+
+            let store = SessionStore(defaults: defaults)
+            store.recordInterruptedSession(presetName: "T", focusMinutes: 60, sessionNumber: 1, totalSessions: 5)
+
+            #expect(store.hasAnyRecord(on: Date()) == true,
+                    "El calendario debe mostrar el día con entry mínimo")
+            #expect(store.totalFocusMinutes(on: Date()) == 0,
+                    "Pero sin minutos reales de trabajo")
+        }
     }
 }

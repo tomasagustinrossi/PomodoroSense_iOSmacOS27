@@ -1,4 +1,21 @@
+//
+//  SessionRewardPopup.swift
+//  PomodoroSense
+//
+
 import SwiftUI
+
+struct FallingChip: Identifiable {
+    let id = UUID()
+    let startX: CGFloat
+    let startY: CGFloat
+    let endY: CGFloat
+    let size: CGFloat
+    let rotation: Double
+    let delay: Double
+    let duration: Double
+    let color: Color
+}
 
 struct SessionRewardPopup: View {
     let payload: SessionRewardPayload
@@ -9,49 +26,44 @@ struct SessionRewardPopup: View {
     var onDismiss: () -> Void
 
     @State private var appeared = false
-    @State private var chipsAnimated = false
-    @State private var luckyAnimated = false
+    @State private var contentVisible = false
 
     var body: some View {
         ZStack {
-            // Backdrop
-            Rectangle()
-                .fill(.ultraThinMaterial)
+            // Backdrop tenue
+            Color.black.opacity(0.25)
                 .ignoresSafeArea()
-                .overlay(Color.black.opacity(0.35).ignoresSafeArea())
                 .opacity(appeared ? 1 : 0)
-                .contentShape(Rectangle())
                 .onTapGesture { dismiss() }
 
-            // Card
-            VStack(spacing: 22) {
-                iconBadge
-                headerRow
-                chipsDisplay
-                streakRow
-                continueButton
+            // Card compacto
+            VStack(spacing: 12) {
+                iconRow
+                amountRow
+                if payload.silverEarned > 0 || payload.goldEarned > 0 {
+                    extraTiersRow
+                }
+                if payload.newStreak > 0 {
+                    streakRow
+                }
             }
-            .padding(28)
-            .frame(maxWidth: 340)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
             .background(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(backgroundColor)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
                             .stroke(
-                                payload.isLucky
-                                    ? Color.yellow.opacity(0.4)
-                                    : accentColor.opacity(0.2),
-                                lineWidth: 1
+                                payload.isJackpot
+                                    ? Color.yellow.opacity(0.5)
+                                    : accentColor.opacity(0.15),
+                                lineWidth: payload.isJackpot ? 1.5 : 1
                             )
                     )
             )
-            .shadow(color: .black.opacity(0.5), radius: 40, x: 0, y: 20)
-            .shadow(
-                color: payload.isLucky ? .yellow.opacity(0.25) : .clear,
-                radius: 30, x: 0, y: 0
-            )
-            .scaleEffect(appeared ? 1 : 0.85)
+            .shadow(color: .black.opacity(0.35), radius: 30, x: 0, y: 15)
+            .scaleEffect(appeared ? 1 : 0.9)
             .opacity(appeared ? 1 : 0)
         }
         .onAppear(perform: animateIn)
@@ -59,150 +71,143 @@ struct SessionRewardPopup: View {
 
     // MARK: - Componentes
 
-    private var iconBadge: some View {
-        ZStack {
-            Circle()
-                .fill(accentColor.opacity(0.12))
-                .frame(width: 90, height: 90)
-
-            Circle()
-                .stroke(
-                    payload.isLucky
-                        ? Color.yellow.opacity(0.5)
-                        : accentColor.opacity(0.35),
-                    lineWidth: 1.5
-                )
-                .frame(width: 90, height: 90)
-
-            CasinoChipView(size: 54, tint: accentColor)
-                .scaleEffect(chipsAnimated ? 1.0 : 0.4)
-                .rotationEffect(.degrees(chipsAnimated ? 0 : -180))
-                .opacity(chipsAnimated ? 1 : 0)
-        }
-    }
-
-    private var headerRow: some View {
-        VStack(spacing: 6) {
-            Text(payload.isLastSession ? "ALL SESSIONS COMPLETE" : "SESSION COMPLETE")
-                .font(.system(size: 11, weight: .bold))
-                .tracking(3)
-                .foregroundColor(dimmedColor)
-
-            if payload.isLucky {
-                Text("LUCKY!")
-                    .font(.system(size: 15, weight: .heavy))
-                    .tracking(4)
+    private var iconRow: some View {
+        HStack(spacing: 6) {
+            if payload.isJackpot {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundColor(.yellow)
-                    .shadow(color: .yellow.opacity(0.7), radius: 10)
-                    .scaleEffect(luckyAnimated ? 1.0 : 0.6)
-                    .opacity(luckyAnimated ? 1 : 0)
+                Text("JACKPOT")
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(3)
+                    .foregroundColor(.yellow)
+            } else if payload.isLucky {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.yellow)
+                Text("LUCKY")
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(3)
+                    .foregroundColor(.yellow)
+            } else if payload.newlyUnlockedTier != nil {
+                Image(systemName: "lock.open.fill")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(payload.newlyUnlockedTier!.tintColor)
+                Text("UNLOCKED")
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(3)
+                    .foregroundColor(payload.newlyUnlockedTier!.tintColor)
+            } else {
+                Text("SESSION COMPLETE")
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(3)
+                    .foregroundColor(dimmedColor)
             }
         }
+        .opacity(contentVisible ? 1 : 0)
     }
 
-    private var chipsDisplay: some View {
-        VStack(spacing: 2) {
-            Text("+\(payload.chipsEarned)")
-                .font(.system(size: 60, weight: .heavy, design: .rounded))
-                .monospacedDigit()
-                .foregroundColor(accentColor)
-                .scaleEffect(chipsAnimated ? 1.0 : 0.4)
-                .opacity(chipsAnimated ? 1 : 0)
+    private var amountRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "circle.hexagongrid.fill")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(payload.isJackpot ? .yellow : accentColor)
 
-            Text(payload.chipsEarned == 1 ? "CHIP" : "CHIPS")
-                .font(.system(size: 11, weight: .bold))
-                .tracking(4)
+            Text("+\(payload.bronzeEarned)")
+                .font(.system(size: 40, weight: .heavy, design: .rounded))
+                .monospacedDigit()
+                .foregroundColor(payload.isJackpot ? .yellow : accentColor)
+                .shadow(
+                    color: payload.isJackpot ? .yellow.opacity(0.5) : .clear,
+                    radius: 12
+                )
+
+            Text(payload.bronzeEarned == 1 ? "CHIP" : "CHIPS")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(2)
                 .foregroundColor(dimmedColor)
-                .opacity(chipsAnimated ? 1 : 0)
+                .padding(.bottom, 4)
         }
+        .scaleEffect(contentVisible ? 1.0 : 0.7)
+        .opacity(contentVisible ? 1 : 0)
+    }
+
+    private var extraTiersRow: some View {
+        HStack(spacing: 10) {
+            if payload.silverEarned > 0 {
+                tierBadge(amount: payload.silverEarned,
+                          label: "SILVER",
+                          tint: CurrencyTier.silver.tintColor)
+            }
+            if payload.goldEarned > 0 {
+                tierBadge(amount: payload.goldEarned,
+                          label: "CROWN",
+                          tint: CurrencyTier.gold.tintColor)
+            }
+        }
+        .opacity(contentVisible ? 1 : 0)
+    }
+
+    private func tierBadge(amount: Int, label: String, tint: Color) -> some View {
+        HStack(spacing: 4) {
+            Text("+\(amount)")
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .monospacedDigit()
+                .foregroundColor(tint)
+            Text(label)
+                .font(.system(size: 8, weight: .bold))
+                .tracking(1.5)
+                .foregroundColor(tint.opacity(0.7))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            Capsule().fill(tint.opacity(0.1))
+        )
     }
 
     private var streakRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 5) {
             Image(systemName: "flame.fill")
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(size: 10, weight: .bold))
                 .foregroundColor(.orange)
-                .shadow(color: .orange.opacity(0.5), radius: 5)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text("\(payload.newStreak)")
-                    .font(.system(size: 22, weight: .heavy, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundColor(.white)
-                    .contentTransition(.numericText())
-
-                Text(payload.newStreak == 1 ? "DAY STREAK" : "DAYS STREAK")
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundColor(dimmedColor)
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 1) {
-                Text("\(payload.totalChipsToday)")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundColor(dimmedColor)
-
-                Text("TODAY")
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundColor(dimmedColor.opacity(0.7))
-            }
+            Text("\(payload.newStreak)")
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .monospacedDigit()
+                .foregroundColor(.white.opacity(0.85))
+            Text(payload.newStreak == 1 ? "DAY" : "DAYS")
+                .font(.system(size: 8, weight: .bold))
+                .tracking(1.5)
+                .foregroundColor(dimmedColor)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.04))
+            Capsule().fill(Color.white.opacity(0.05))
         )
-        .opacity(chipsAnimated ? 1 : 0)
-    }
-
-    private var continueButton: some View {
-        Button(action: dismiss) {
-            Text("CONTINUE")
-                .font(.system(size: 12, weight: .bold))
-                .tracking(3)
-                .foregroundColor(backgroundColor)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 12).fill(accentColor)
-                )
-                .contentShape(RoundedRectangle(cornerRadius: 12))
-        }
-        .buttonStyle(PressableButtonStyle())
-        .opacity(chipsAnimated ? 1 : 0)
+        .opacity(contentVisible ? 1 : 0)
     }
 
     // MARK: - Animación
 
     private func animateIn() {
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             appeared = true
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.68)) {
-                chipsAnimated = true
-            }
-        }
-        if payload.isLucky {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.55)) {
-                    luckyAnimated = true
-                }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) {
+                contentVisible = true
             }
         }
     }
 
     private func dismiss() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
             appeared = false
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             onDismiss()
         }
     }
 }
+

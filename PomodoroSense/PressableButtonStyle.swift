@@ -1,4 +1,12 @@
 //
+//  PressableButtonStyle.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 12/10/2026.
+//
+
+
+//
 //  UIStyles.swift
 //  PomodoroSense
 //
@@ -22,5 +30,14 @@ struct PressableButtonStyle: ButtonStyle {
                 .spring(response: 0.22, dampingFraction: 0.7),
                 value: configuration.isPressed
             )
+    }
+}
+
+// MARK: - Área táctil mínima
+extension View {
+    /// Garantiza que el área de toque sea al menos de 44x44 puntos.
+    func minTapTarget(_ size: CGFloat = 44) -> some View {
+        self.frame(minWidth: size, minHeight: size)
+            .contentShape(Rectangle())
     }
 }

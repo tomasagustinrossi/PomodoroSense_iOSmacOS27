@@ -2,28 +2,26 @@
 //  CurrencyTier.swift
 //  PomodoroSense
 //
-//  Created by Tomas Rossi on 09/10/2026.
-//
-
 
 import Foundation
+import SwiftUI
 
 /// Los tres niveles de moneda del sistema.
-/// El sistema es "prestige": cada tier se desbloquea al maximizar el anterior.
-/// Los valores de `softCap` y `difficultyMultiplier` son los que se ajustan
-/// cuando se agregan items a la tienda (para que el total jugable alcance).
-enum CurrencyTier: String, Codable, CaseIterable, Identifiable {
+/// Prestige: cada tier se desbloquea al maximizar el anterior.
+nonisolated enum CurrencyTier: String, Codable, CaseIterable, Identifiable {
     case bronze
     case silver
     case gold
 
     var id: String { rawValue }
 
+    // MARK: - Modelo
+
     var displayName: String {
         switch self {
         case .bronze: return "CHIPS"
         case .silver: return "SILVER"
-        case .gold:   return "GOLD"
+        case .gold:   return "CROWN"
         }
     }
 
@@ -35,35 +33,32 @@ enum CurrencyTier: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Cap máximo alcanzable por juego normal (sin contar drops de tienda).
-    /// ⚠️ AJUSTAR cuando agregues items: debe ser ≥ a la suma de costos
-    /// de todos los items del tier en la tienda.
+    /// Cap máximo alcanzable por juego normal.
+    /// Los valores viven en `CurrencyBalance.swift`.
     var softCap: Int {
         switch self {
-        case .bronze: return 1000
-        case .silver: return 500
-        case .gold:   return 200
+        case .bronze: return CurrencyBalance.bronzeSoftCap
+        case .silver: return CurrencyBalance.silverSoftCap
+        case .gold:   return CurrencyBalance.goldSoftCap
         }
     }
 
     /// Multiplicador de dificultad relativo al tier base.
-    /// Cuanto más alto, más lento se acumula este tier.
-    /// - Silver tarda ~2 meses de racha mantenida.
-    /// - Gold tarda mucho más y es el techo final.
+    /// Los valores viven en `CurrencyBalance.swift`.
     var difficultyMultiplier: Double {
         switch self {
-        case .bronze: return 1.0
-        case .silver: return 10.0
-        case .gold:   return 50.0
+        case .bronze: return CurrencyBalance.bronzeDifficulty
+        case .silver: return CurrencyBalance.silverDifficulty
+        case .gold:   return CurrencyBalance.goldDifficulty
         }
     }
 
-    /// Condición de desbloqueo de este tier.
+    /// Condición de desbloqueo.
     var unlockCondition: UnlockCondition {
         switch self {
         case .bronze: return .always
-        case .silver: return .streak(minimum: 26)
-        case .gold:   return .previousTierMaxed(.silver)
+        case .silver: return .streak(minimum: CurrencyBalance.silverUnlockStreak)
+        case .gold:   return .streak(minimum: CurrencyBalance.goldUnlockStreak) // <-- NUEVA REGLA
         }
     }
 
@@ -73,6 +68,43 @@ enum CurrencyTier: String, Codable, CaseIterable, Identifiable {
         case previousTierMaxed(CurrencyTier)
     }
 
-    /// Orden jerárquico para iterar (bronze < silver < gold).
     static var ordered: [CurrencyTier] { [.bronze, .silver, .gold] }
+
+    // MARK: - UI
+
+    /// Color principal del tier.
+    var tintColor: Color {
+        switch self {
+        case .bronze: return Color(red: 0.95, green: 0.65, blue: 0.40)
+        case .silver: return Color(red: 0.78, green: 0.82, blue: 0.88)
+        case .gold:   return Color(red: 1.00, green: 0.82, blue: 0.30)
+        }
+    }
+
+    /// Color secundario para gradientes.
+    var tintColorSecondary: Color {
+        switch self {
+        case .bronze: return Color(red: 0.80, green: 0.50, blue: 0.25)
+        case .silver: return Color(red: 0.55, green: 0.60, blue: 0.68)
+        case .gold:   return Color(red: 0.90, green: 0.62, blue: 0.15)
+        }
+    }
+
+    /// Ícono para la insignia del tier.
+    var iconName: String {
+        switch self {
+        case .bronze: return "circle.hexagongrid.fill"
+        case .silver: return "circle.hexagongrid.circle.fill"
+        case .gold:   return "crown.fill"
+        }
+    }
+
+    /// Texto de desbloqueo para el popup especial.
+    var unlockHeadline: String {
+        switch self {
+        case .bronze: return "SILVER TIER REACHED"
+        case .silver: return "GOLD TIER REACHED"
+        case .gold:   return "MAX TIER REACHED"
+        }
+    }
 }

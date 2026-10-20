@@ -3,9 +3,31 @@ import SwiftUI
 import UIKit
 #endif
 
+//  Cambios respecto a la versión anterior:
+//    · Al reabrir el popup estando ya vinculado, muestra "conectado"
+//      (antes mostraba los botones de master/mirror aunque hubiera sesión).
+//    · "Resume on relaunch": estado local sincronizado con SyncPersistence.
+//      Leer/escribir el singleton dentro de un Binding no invalida la vista
+//      si no es observable, y el switch parecía "volver" a su valor.
+//    · LINK / QR: estado `isLinking` (sin toques dobles ni conexiones
+//      duplicadas) + Enter en el campo para vincular.
+//    · Mientras un peer conecta, se bloquean el resto de acciones y se
+//      aplica un timeout de 15s que cancela el intento (no se reconecta
+//      solo, coherente con "la activación la elige el usuario").
+//    · Borrar un dispositivo vinculado pide confirmación.
+//    · `.idle` ya no borra el mensaje de error (si no, el mensaje del
+//      timeout se perdía al volver el engine a idle).
+//    · CANCEL con estilo plano (en macOS salía como botón con borde).
+//    · Escape cierra el popup (.cancelAction) y etiquetas de accesibilidad.
+//  `generatedCode` y `hostingWaitingView` se conservan aunque hoy no se
+//  lean/usen, por si los necesitás más adelante.
+
 struct SyncSettingsPopup: View {
 
     @ObservedObject var timerVM: TimerViewModel
+    
+    @AppStorage("mirror_mode_enabled") private var isMirrorModeEnabled: Bool = false
+    @AppStorage("sfx_volume") private var sfxVolume: Double = 0.8
 
     var accentColor: Color
     var dimmedColor: Color
@@ -20,7 +42,13 @@ struct SyncSettingsPopup: View {
     @State private var knownPeers: [KnownPeer] = []
     @State private var connectingPeerId: String?
     @State private var peerBeingRenamed: KnownPeer? = nil
+    @State private var peerPendingDelete: KnownPeer? = nil
     @State private var renameDraft: String = ""
+    @State private var isLinking: Bool = false
+    @State private var resumeOnRelaunch: Bool = false
+
+    /// Tiempo máximo esperando que un dispositivo vinculado responda.
+    private static let reconnectTimeout: Duration = .seconds(15)
 
     /// Ramas del flujo de emparejamiento. El `syncState` del engine
     /// se mapea a estas ramas para que la UI no dependa de sus errores
@@ -32,6 +60,9 @@ struct SyncSettingsPopup: View {
         case enteringCode
         case connected
     }
+
+    /// Hay un intento de reconexión en curso.
+    private var isBusy: Bool { connectingPeerId != nil }
 
     var body: some View {
         ZStack {
@@ -53,11 +84,59 @@ struct SyncSettingsPopup: View {
 
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack(spacing: 22) {
+                        // 1. RESUME ON RELAUNCH
                         resumeOnRelaunchToggle
+                        
+                        // 2. CONTROL DE VOLUMEN
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("SFX & MUSIC VOLUME")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .tracking(1.5)
+                                    .foregroundColor(dimmedColor.opacity(0.8))
+                                Spacer()
+                                Text("\(Int(sfxVolume * 100))%")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(accentColor)
+                            }
+                            
+                            Slider(value: $sfxVolume, in: 0...1, step: 0.05)
+                                .tint(accentColor)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
 
-                        Divider().background(dimmedColor.opacity(0.15))
+                        // 3. TOGGLE MIRROR MODE
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("ENABLE MIRROR MODE")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .tracking(1.5)
+                                    .foregroundColor(isMirrorModeEnabled ? accentColor : dimmedColor.opacity(0.8))
+                                Spacer()
+                                Toggle("", isOn: $isMirrorModeEnabled)
+                                    .toggleStyle(.switch)
+                                    .tint(accentColor)
+                                    .controlSize(.small)
+                                    .fixedSize()
+                            }
+                            Text("Link your devices to sync timers in real-time.")
+                                .font(.system(size: 10))
+                                .foregroundColor(dimmedColor.opacity(0.6))
+                                .multilineTextAlignment(.leading)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
 
-                        mirrorModeSection
+                        // 4. SECCIÓN MIRROR (solo si está habilitado y con divisor)
+                        if isMirrorModeEnabled {
+                            Divider().background(dimmedColor.opacity(0.15))
+                                .padding(.vertical, 4)
+                            
+                            mirrorModeSection
+                        }
                     }
                     .padding(.horizontal, 28)
                     .padding(.bottom, 28)
@@ -77,8 +156,21 @@ struct SyncSettingsPopup: View {
         }
         .onChange(of: timerVM.syncState) { _, newState in
             handleSyncStateChange(newState)
-        }.onAppear {
+        }
+        .onChange(of: isMirrorModeEnabled) { _, enabled in
+            if !enabled {
+                Task { await timerVM.disableSync() }
+                errorMessage = nil
+                flow = .idle
+            }
+        }
+        .onAppear {
             knownPeers = SyncPersistence.shared.knownPeers
+            resumeOnRelaunch = SyncPersistence.shared.resumeSessionOnRelaunch
+            // Si ya hay una sesión vinculada, reflejarla al abrir el popup.
+            if case .connected = timerVM.syncState {
+                flow = .connected
+            }
         }
         .alert(
             "Rename Device",
@@ -102,6 +194,22 @@ struct SyncSettingsPopup: View {
         } message: {
             Text("Choose a friendly name for this paired device.")
         }
+        .confirmationDialog(
+            "Remove this device?",
+            isPresented: Binding(
+                get: { peerPendingDelete != nil },
+                set: { if !$0 { peerPendingDelete = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: peerPendingDelete
+        ) { peer in
+            Button("Remove \(peer.name)", role: .destructive) {
+                deletePeer(peer)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("You'll need to pair it again to reconnect.")
+        }
         #if os(iOS)
         .fullScreenCover(isPresented: Binding(
             get: { flow == .scanning },
@@ -109,12 +217,17 @@ struct SyncSettingsPopup: View {
         )) {
             QRScannerView(
                 onScan: { raw in
-                    flow = .idle
                     guard let canonical = LocalSyncTransport.canonicalize(raw) else {
                         errorMessage = "Invalid QR code"
+                        flow = .enteringCode
                         return
                     }
+                    errorMessage = nil
                     inputCode = formatCode(canonical)
+                    // Volvemos a la pantalla de código para mostrar el
+                    // estado "LINKING…" mientras conecta.
+                    flow = .enteringCode
+                    isLinking = true
                     timerVM.startSyncAsMirror(pairingCode: canonical)
                 },
                 onCancel: { flow = .idle }
@@ -132,8 +245,11 @@ struct SyncSettingsPopup: View {
             flow = .idle
             generatedCode = nil
             inputCode = ""
-            errorMessage = nil
-            connectingPeerId = nil              // ← AGREGAR
+            // errorMessage NO se borra acá: lo limpia cada acción del
+            // usuario, y así sobrevive un mensaje puesto justo antes de
+            // que el engine vuelva a idle (por ejemplo tras un timeout).
+            connectingPeerId = nil
+            isLinking = false
             knownPeers = SyncPersistence.shared.knownPeers
 
         case .hosting:
@@ -141,13 +257,16 @@ struct SyncSettingsPopup: View {
 
         case .connected:
             flow = .connected
-            connectingPeerId = nil              // ← AGREGAR
+            errorMessage = nil
+            connectingPeerId = nil
+            isLinking = false
             knownPeers = SyncPersistence.shared.knownPeers
 
         case .error(let err):
             errorMessage = err.localizedDescription
             flow = .idle
-            connectingPeerId = nil              // ← AGREGAR
+            connectingPeerId = nil
+            isLinking = false
 
         case .browsing, .waiting:
             break
@@ -158,11 +277,11 @@ struct SyncSettingsPopup: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: "rectangle.connected.to.line.below")
+            Image(systemName: "slider.horizontal.3")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(accentColor)
 
-            Text("MIRROR MODE")
+            Text("CONFIGURATIONS")
                 .font(.system(size: 13, weight: .bold))
                 .tracking(3)
                 .foregroundColor(accentColor)
@@ -175,6 +294,8 @@ struct SyncSettingsPopup: View {
                     .foregroundColor(dimmedColor)
             }
             .buttonStyle(.plain)
+            .keyboardShortcut(.cancelAction)
+            .accessibilityLabel("Close")
         }
     }
 
@@ -187,7 +308,7 @@ struct SyncSettingsPopup: View {
                     .font(.system(size: 10, weight: .bold))
                     .tracking(1.5)
                     .foregroundColor(
-                        SyncPersistence.shared.resumeSessionOnRelaunch
+                        resumeOnRelaunch
                             ? accentColor
                             : dimmedColor.opacity(0.8)
                     )
@@ -195,13 +316,17 @@ struct SyncSettingsPopup: View {
                 Spacer()
 
                 Toggle(isOn: Binding(
-                    get: { SyncPersistence.shared.resumeSessionOnRelaunch },
-                    set: { SyncPersistence.shared.resumeSessionOnRelaunch = $0 }
+                    get: { resumeOnRelaunch },
+                    set: { newValue in
+                        resumeOnRelaunch = newValue
+                        SyncPersistence.shared.resumeSessionOnRelaunch = newValue
+                    }
                 )) { EmptyView() }
                     .toggleStyle(.switch)
                     .tint(accentColor)
                     .controlSize(.small)
                     .fixedSize()
+                    .accessibilityLabel("Resume on relaunch")
             }
 
             Text("Restore your active session if the app closes unexpectedly.")
@@ -223,28 +348,23 @@ struct SyncSettingsPopup: View {
     @ViewBuilder
     private var mirrorModeSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("NETWORK SYNC")
-                .font(.system(size: 10, weight: .bold))
-                .tracking(2)
-                .foregroundColor(dimmedColor)
+            HStack(spacing: 8) {
+                Image(systemName: "rectangle.connected.to.line.below")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(accentColor)
+
+                Text("MIRROR MODE")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(2)
+                    .foregroundColor(dimmedColor)
+            }
 
             switch flow {
-            case .idle:
-                idlePairingView
-
-            case .hostingWithQR(let code):
-                hostingQRView(code: code)
-
-            case .scanning:
-                // Solo iOS: el fullScreenCover muestra la cámara.
-                // Este placeholder llena el espacio mientras aparece.
-                Color.clear.frame(height: 100)
-
-            case .enteringCode:
-                enteringCodeView
-
-            case .connected:
-                connectedView
+            case .idle:            idlePairingView
+            case .hostingWithQR(let code): hostingQRView(code: code)
+            case .scanning:        Color.clear.frame(height: 100)
+            case .enteringCode:    enteringCodeView
+            case .connected:       connectedView
             }
         }
         .animation(.easeInOut(duration: 0.25), value: flow)
@@ -269,6 +389,8 @@ struct SyncSettingsPopup: View {
             ) {
                 startAsMaster()
             }
+            .disabled(isBusy)
+            .opacity(isBusy ? 0.5 : 1)
 
             HStack {
                 Rectangle().fill(dimmedColor.opacity(0.2)).frame(height: 1)
@@ -286,6 +408,8 @@ struct SyncSettingsPopup: View {
                 errorMessage = nil
                 flow = .enteringCode
             }
+            .disabled(isBusy)
+            .opacity(isBusy ? 0.5 : 1)
 
             // Peers guardados al fondo, separados por un divisor.
             if !knownPeers.isEmpty {
@@ -307,7 +431,7 @@ struct SyncSettingsPopup: View {
             }
         }
     }
-    
+
     private func knownPeerRow(_ peer: KnownPeer) -> some View {
         let isConnecting = connectingPeerId == peer.id
 
@@ -356,7 +480,7 @@ struct SyncSettingsPopup: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(isConnecting)
+            .disabled(isBusy)
 
             // Lápiz
             Button(action: { beginRename(peer) }) {
@@ -367,11 +491,11 @@ struct SyncSettingsPopup: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(isConnecting)
+            .disabled(isBusy)
             .accessibilityLabel("Rename device")
 
-            // Tacho
-            Button(action: { deletePeer(peer) }) {
+            // Tacho (pide confirmación)
+            Button(action: { peerPendingDelete = peer }) {
                 Image(systemName: "trash.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.red.opacity(0.75))
@@ -379,7 +503,7 @@ struct SyncSettingsPopup: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(isConnecting)
+            .disabled(isBusy)
             .accessibilityLabel("Remove device")
         }
         .padding(.horizontal, 12)
@@ -398,7 +522,7 @@ struct SyncSettingsPopup: View {
         .scaleEffect(isConnecting ? 1.02 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isConnecting)
     }
-    
+
     private func beginRename(_ peer: KnownPeer) {
         peerBeingRenamed = peer
         renameDraft = peer.name
@@ -413,14 +537,25 @@ struct SyncSettingsPopup: View {
     }
 
     private func connectToKnownPeer(_ peer: KnownPeer) {
+        guard !isBusy else { return }
         errorMessage = nil
-        #if os(iOS)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        #endif
+        Haptics.impact(.medium, intensity: 0.7)
+        let peerID = peer.id
         withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-            connectingPeerId = peer.id
+            connectingPeerId = peerID
         }
         timerVM.reconnectToKnownPeer(peer)
+
+        // Timeout: si el otro dispositivo no responde, cortamos el intento
+        // (y lo cancelamos en el engine para que no se conecte solo más
+        // tarde: la vinculación la decide el usuario).
+        Task {
+            try? await Task.sleep(for: Self.reconnectTimeout)
+            guard connectingPeerId == peerID else { return }
+            connectingPeerId = nil
+            await timerVM.disableSync()
+            errorMessage = "Couldn't reach \(peer.name). Make sure the other device is sharing its timer."
+        }
     }
 
     private func deletePeer(_ peer: KnownPeer) {
@@ -444,9 +579,7 @@ struct SyncSettingsPopup: View {
 
             Button(action: {
                 Clipboard.copy(code)
-                #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
+                Haptics.impact(.light, intensity: 0.6)
             }) {
                 HStack(spacing: 6) {
                     Image(systemName: "doc.on.doc")
@@ -477,6 +610,7 @@ struct SyncSettingsPopup: View {
     }
 
     // MARK: - Master: esperando conexión entrante
+    // (No se usa hoy: el flujo master muestra directamente el QR.)
 
     private var hostingWaitingView: some View {
         VStack(spacing: 16) {
@@ -514,6 +648,8 @@ struct SyncSettingsPopup: View {
                 errorMessage = nil
                 flow = .scanning
             }
+            .disabled(isLinking)
+            .opacity(isLinking ? 0.5 : 1)
 
             Text("OR PASTE THE CODE")
                 .font(.system(size: 10, weight: .bold))
@@ -550,18 +686,22 @@ struct SyncSettingsPopup: View {
                 .keyboardType(.asciiCapable)
                 .textInputAutocapitalization(.characters)
                 #endif
+                .disabled(isLinking)
                 .onChange(of: inputCode) { _, newValue in
                     let formatted = formatCode(newValue)
                     if formatted != newValue { inputCode = formatted }
                 }
+                .onSubmit { linkWithTypedCode() }
 
-            actionButton(title: "LINK", icon: "link", isPrimary: false) {
-                guard let canonical = LocalSyncTransport.canonicalize(inputCode) else { return }
-                errorMessage = nil
-                timerVM.startSyncAsMirror(pairingCode: canonical)
+            actionButton(
+                title: isLinking ? "LINKING…" : "LINK",
+                icon: "link",
+                isPrimary: false
+            ) {
+                linkWithTypedCode()
             }
-            .opacity(isValidTypedCode ? 1.0 : 0.5)
-            .disabled(!isValidTypedCode)
+            .opacity(isValidTypedCode && !isLinking ? 1.0 : 0.5)
+            .disabled(!isValidTypedCode || isLinking)
 
             cancelButton
         }
@@ -597,8 +737,10 @@ struct SyncSettingsPopup: View {
             generatedCode = nil
             errorMessage = nil
             inputCode = ""
+            isLinking = false
             flow = .idle
         }
+        .buttonStyle(.plain) // en macOS, sin esto sale con borde de botón
         .font(.system(size: 11, weight: .bold))
         .tracking(1.5)
         .foregroundColor(.red.opacity(0.8))
@@ -616,6 +758,14 @@ struct SyncSettingsPopup: View {
         } catch {
             errorMessage = "Failed to start hosting: \(error.localizedDescription)"
         }
+    }
+
+    private func linkWithTypedCode() {
+        guard !isLinking,
+              let canonical = LocalSyncTransport.canonicalize(inputCode) else { return }
+        errorMessage = nil
+        isLinking = true
+        timerVM.startSyncAsMirror(pairingCode: canonical)
     }
 
     // MARK: - Botón reutilizable

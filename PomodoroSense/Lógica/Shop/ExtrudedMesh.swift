@@ -2,6 +2,14 @@
 //  ExtrudedMesh.swift
 //  PomodoroSense
 //
+//  Created by Tomas Rossi on 18/10/2026.
+//
+
+
+//
+//  ExtrudedMesh.swift
+//  PomodoroSense
+//
 //  Extrusión propia (sin SCNShape): tapas trianguladas con huecos, paredes con
 //  normales calculadas a mano y bisel redondeado. Garantiza que las paredes de
 //  los huecos miren hacia el vacío (nada "se exterioriza"), para cualquier icono.

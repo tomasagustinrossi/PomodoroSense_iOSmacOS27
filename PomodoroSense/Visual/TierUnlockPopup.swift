@@ -1,3 +1,11 @@
+//
+//  TierUnlockPopup.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 09/10/2026.
+//
+
+
 import SwiftUI
 
 struct TierUnlockPopup: View {
@@ -127,7 +135,7 @@ struct TierUnlockPopup: View {
     }
 
     private var continueButton: some View {
-        Button(action: dismiss) {
+        Button(action: { dismiss() }) {
             Text("CONTINUE")
                 .font(.system(size: 12, weight: .bold))
                 .tracking(3)
@@ -146,9 +154,7 @@ struct TierUnlockPopup: View {
     // MARK: - Animación
 
     private func animateIn() {
-        #if os(iOS)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        #endif
+        Haptics.success()
 
         withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) {
             appeared = true

@@ -1,3 +1,13 @@
+//
+//  TimerViewModelPassiveUnlinkTests.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 12/10/2026.
+//
+
+import Testing
+import Foundation
+@testable import PomodoroSense
 @Suite("TimerViewModel — desvinculación pasiva no navega")
 @MainActor
 struct TimerViewModelPassiveUnlinkTests {

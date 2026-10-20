@@ -1,4 +1,12 @@
 //
+//  CalendarColorTier.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 13/10/2026.
+//
+
+
+//
 //  CalendarColorCalculator.swift
 //  PomodoroSense
 //
@@ -13,7 +21,7 @@ import Foundation
 
 // MARK: - Tier
 
-enum CalendarColorTier: Equatable {
+enum CalendarColorTier: Equatable, Comparable {
     case empty       // sin records
     case noFocus     // con records pero sin focus completado (todos skip/interrupt)
     case level1
@@ -21,8 +29,24 @@ enum CalendarColorTier: Equatable {
     case level3
     case level4
     case level5
-}
 
+    /// Orden interno para comparaciones. Cuanto más alto, "mejor" el día.
+    private var sortOrder: Int {
+        switch self {
+        case .empty:   return 0
+        case .noFocus: return 1
+        case .level1:  return 2
+        case .level2:  return 3
+        case .level3:  return 4
+        case .level4:  return 5
+        case .level5:  return 6
+        }
+    }
+
+    static func < (lhs: Self, rhs: Self) -> Bool {
+        lhs.sortOrder < rhs.sortOrder
+    }
+}
 // MARK: - Thresholds
 
 struct CalendarColorThresholds: Equatable {

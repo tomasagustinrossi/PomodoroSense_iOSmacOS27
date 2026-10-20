@@ -2,88 +2,110 @@ import SwiftUI
 
 // MARK: - Ecualizador conectado al TimerViewModel
 //
-// Este sheet reemplaza al antiguo. Ahora:
 // - Recibe el TimerViewModel y le aplica los cambios en vivo.
-// - Cambiar el ruido de color actualiza el tema visual (colores) sin resetear el cronómetro.
-// - Cambiar la frecuencia binaural NO toca el tema visual.
-// - Los volúmenes se persisten por id en UserDefaults (como ya hacía AudioManager).
+// - Cambiar noiseId actualiza el tema visual (colores) sin resetear el cronómetro.
+// - Cambiar freqId NO toca el tema visual.
+// - Al cerrarse, llama a `onSave` para persistir en el repositorio de presets.
+// - Ahora es una vista overlay (no sheet) para permitir dismiss al tocar fuera en macOS.
+
+import SwiftUI
 
 struct EqualizerSheetView: View {
-    @Environment(\.dismiss) var dismiss
-
-    @ObservedObject var timerViewModel: TimerViewModel
+    var initialNoiseId: Int
+    var initialFreqId: Int
 
     var accentColor: Color
     var dimmedColor: Color
     var backgroundColor: Color
 
-    // Estado local espejo del TimerViewModel / AudioManager
-    @State private var selectedNoiseId: Int = 1
-    @State private var selectedFreqId: Int = 1
-    @State private var noiseVolume: Double = 0.5
-    @State private var freqVolume: Double = 0.5
+    /// Se dispara cada vez que el usuario cambia ruido o frecuencia.
+    var onNoiseChanged: (Int) -> Void
+    var onFreqChanged: (Int) -> Void
+
+    /// Se dispara al cerrar (para persistir si aplica).
+    var onSave: (() -> Void)? = nil
+    var onDismiss: (() -> Void)? = nil
+
+    @State private var selectedNoiseId: Int
+    @State private var selectedFreqId: Int
+    @State private var noiseVolume: Double
+    @State private var freqVolume: Double
     @State private var didLoadInitialState = false
 
-    #if os(iOS)
-    @Environment(\.verticalSizeClass) var verticalSizeClass
-    private var isPortrait: Bool { verticalSizeClass == .regular }
-    #else
-    private var isPortrait: Bool { false }
-    #endif
+    init(
+        initialNoiseId: Int,
+        initialFreqId: Int,
+        accentColor: Color,
+        dimmedColor: Color,
+        backgroundColor: Color,
+        onNoiseChanged: @escaping (Int) -> Void,
+        onFreqChanged: @escaping (Int) -> Void,
+        onSave: (() -> Void)? = nil,
+        onDismiss: (() -> Void)? = nil
+    ) {
+        self.initialNoiseId = initialNoiseId
+        self.initialFreqId = initialFreqId
+        self.accentColor = accentColor
+        self.dimmedColor = dimmedColor
+        self.backgroundColor = backgroundColor
+        self.onNoiseChanged = onNoiseChanged
+        self.onFreqChanged = onFreqChanged
+        self.onSave = onSave
+        self.onDismiss = onDismiss
+
+        _selectedNoiseId = State(initialValue: initialNoiseId)
+        _selectedFreqId  = State(initialValue: initialFreqId)
+        _noiseVolume = State(initialValue: Double(AudioManager.shared.getNoiseVolume(id: initialNoiseId)))
+        _freqVolume  = State(initialValue: Double(AudioManager.shared.getFreqVolume(id: initialFreqId)))
+    }
 
     var body: some View {
         ZStack {
-            backgroundColor.ignoresSafeArea()
+            backgroundColor
 
-            VStack(spacing: 30) {
+            VStack(spacing: 24) {
                 header
 
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 40) { equalizerContent }
-                    VStack(spacing: 40) { equalizerContent }
+                    HStack(alignment: .top, spacing: 30) { equalizerContent }
+                    VStack(spacing: 30) { equalizerContent }
                 }
-                .padding(.horizontal, 30)
+                .padding(.horizontal, 24)
 
-                Spacer()
+                Spacer(minLength: 0)
             }
+            .padding(.bottom, 20)
         }
-        .onAppear(perform: loadInitialState)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        #if os(macOS)
+        .onExitCommand { dismissWithSave() }
+        #endif
     }
 
-    // MARK: - Carga inicial y sincronización
-
-    private func loadInitialState() {
-        guard !didLoadInitialState else { return }
-        didLoadInitialState = true
-
-        let audio = timerViewModel.activeConfig.audio
-        selectedNoiseId = audio.noiseId == 0 ? 1 : audio.noiseId
-        selectedFreqId  = audio.freqId  == 0 ? 1 : audio.freqId
-        noiseVolume = Double(AudioManager.shared.getNoiseVolume(id: selectedNoiseId))
-        freqVolume  = Double(AudioManager.shared.getFreqVolume(id: selectedFreqId))
+    private func dismissWithSave() {
+        onSave?()
+        onDismiss?()
     }
-
-    // MARK: - Header
 
     private var header: some View {
         HStack {
             Text("AUDIO EQUALIZER")
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 13, weight: .bold))
                 .tracking(4)
                 .foregroundColor(dimmedColor)
+
             Spacer()
-            Button(action: { dismiss() }) {
+
+            Button(action: dismissWithSave) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 24))
+                    .font(.system(size: 22))
                     .foregroundColor(dimmedColor)
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 30)
-        .padding(.top, 30)
+        .padding(.horizontal, 24)
+        .padding(.top, 20)
     }
-
-    // MARK: - Contenido
 
     @ViewBuilder
     private var equalizerContent: some View {
@@ -91,41 +113,43 @@ struct EqualizerSheetView: View {
         freqPanel
     }
 
-    // MARK: - Panel de ruidos
+    // MARK: - Noise
 
     private var noisePanel: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("NOISE")
+            Text("SOUND")
                 .font(.system(size: 11, weight: .semibold))
                 .tracking(2)
                 .foregroundColor(dimmedColor)
 
-            // Fila de botones para seleccionar el ruido (tap directo, sin picker)
             noiseSelector
 
-            AppleFluidSlider(
-                value: Binding(
-                    get: { noiseVolume },
-                    set: { newValue in
-                        noiseVolume = newValue
-                        AudioManager.shared.setNoiseVolume(
-                            id: selectedNoiseId,
-                            volume: Float(newValue)
-                        )
-                    }
-                ),
-                accentColor: accentColor,
-                icon: "waveform"
-            )
+            if selectedNoiseId != 0 {
+                AppleFluidSlider(
+                    value: Binding(
+                        get: { noiseVolume },
+                        set: { newValue in
+                            noiseVolume = newValue
+                            AudioManager.shared.setNoiseVolume(
+                                id: selectedNoiseId,
+                                volume: Float(newValue)
+                            )
+                        }
+                    ),
+                    accentColor: accentColor,
+                    icon: "waveform"
+                )
+            }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: selectedNoiseId)
     }
 
     private var noiseSelector: some View {
-        HStack(spacing: 8) {
-            noiseButton(id: 1, label: "BROWN")
-            noiseButton(id: 2, label: "PINK")
-            noiseButton(id: 3, label: "WHITE")
-            noiseButton(id: 4, label: "VIOLET")
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 3)
+        return LazyVGrid(columns: columns, spacing: 6) {
+            ForEach(AmbientSound.selectable) { sound in
+                noiseButton(id: sound.rawValue, label: sound.shortName)
+            }
         }
     }
 
@@ -155,14 +179,18 @@ struct EqualizerSheetView: View {
     }
 
     private func selectNoise(id: Int) {
-        guard selectedNoiseId != id else { return }
+        if selectedNoiseId == id {
+            selectedNoiseId = 0
+            noiseVolume = Double(AudioManager.shared.getNoiseVolume(id: 0))
+            onNoiseChanged(0)
+            return
+        }
         selectedNoiseId = id
         noiseVolume = Double(AudioManager.shared.getNoiseVolume(id: id))
-        // Aplica en vivo: cambia el tema visual SIN resetear el cronómetro
-        timerViewModel.updateNoiseId(id)
+        onNoiseChanged(id)
     }
 
-    // MARK: - Panel de frecuencias
+    // MARK: - Freq
 
     private var freqPanel: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -171,32 +199,31 @@ struct EqualizerSheetView: View {
                 .tracking(2)
                 .foregroundColor(dimmedColor)
 
-            freqSelector
+            HStack(spacing: 8) {
+                freqButton(id: 1, label: "40 Hz")
+                freqButton(id: 2, label: "15 Hz")
+                freqButton(id: 3, label: "10 Hz")
+                freqButton(id: 4, label: "6 Hz")
+            }
 
-            AppleFluidSlider(
-                value: Binding(
-                    get: { freqVolume },
-                    set: { newValue in
-                        freqVolume = newValue
-                        AudioManager.shared.setFreqVolume(
-                            id: selectedFreqId,
-                            volume: Float(newValue)
-                        )
-                    }
-                ),
-                accentColor: accentColor,
-                icon: "waveform.path.ecg"
-            )
+            if selectedFreqId != 0 {
+                AppleFluidSlider(
+                    value: Binding(
+                        get: { freqVolume },
+                        set: { newValue in
+                            freqVolume = newValue
+                            AudioManager.shared.setFreqVolume(
+                                id: selectedFreqId,
+                                volume: Float(newValue)
+                            )
+                        }
+                    ),
+                    accentColor: accentColor,
+                    icon: "waveform.path.ecg"
+                )
+            }
         }
-    }
-
-    private var freqSelector: some View {
-        HStack(spacing: 8) {
-            freqButton(id: 1, label: "40 Hz")
-            freqButton(id: 2, label: "15 Hz")
-            freqButton(id: 3, label: "10 Hz")
-            freqButton(id: 4, label: "6 Hz")
-        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: selectedFreqId)
     }
 
     private func freqButton(id: Int, label: String) -> some View {
@@ -225,18 +252,22 @@ struct EqualizerSheetView: View {
     }
 
     private func selectFreq(id: Int) {
-        guard selectedFreqId != id else { return }
+        if selectedFreqId == id {
+            selectedFreqId = 0
+            freqVolume = Double(AudioManager.shared.getFreqVolume(id: 0))
+            onFreqChanged(0)
+            return
+        }
         selectedFreqId = id
         freqVolume = Double(AudioManager.shared.getFreqVolume(id: id))
-        // Aplica en vivo SIN tocar el tema visual
-        timerViewModel.updateFreqId(id)
+        onFreqChanged(id)
     }
 }
 
-// MARK: - Slider fluido (idéntico al que ya tenías)
+// MARK: - Slider fluido
 
 struct AppleFluidSlider: View {
-    @Binding var value: Double // 0.0 a 1.0
+    @Binding var value: Double
     var accentColor: Color
     var icon: String
 

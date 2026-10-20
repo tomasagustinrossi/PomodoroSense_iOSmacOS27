@@ -1,63 +1,72 @@
-//
-//  FreeModeViewModel.swift
-//  PomodoroSense
-//
-//  Created by Tomas Rossi on 17/10/2026.
-//
-
-
-//
-//  FreeModeViewModel.swift
-//  PomodoroSense
-//
-//  ViewModel INDEPENDIENTE para el modo libre.
-//  No toca TimerViewModel, SessionStore ni AudioManager.
-//  Tiene su propio timer, su propio player y su propia persistencia.
-//
-
 import Foundation
 import Combine
-import AVFoundation
+#if os(iOS) && canImport(ActivityKit)
+import ActivityKit
+#endif
 
 @MainActor
 final class FreeModeViewModel: NSObject, ObservableObject {
 
-    // MARK: - Estado de sesión
     @Published private(set) var isRunning = false
     @Published private(set) var elapsed: TimeInterval = 0
     @Published private(set) var sessions: [FreeModeSession] = []
 
-    // MARK: - Música
-    @Published private(set) var musicTitle: String? = nil
-    @Published private(set) var isMusicPlaying = false
-    @Published var musicVolume: Float = 0.8 {
-        didSet { musicPlayer?.volume = musicVolume }
-    }
-    private var musicPlayer: AVAudioPlayer?
-    private var sfxPlayer: AVAudioPlayer?
+    @Published var noiseId: Int = 0
+    @Published var freqId: Int = 0
+    @Published private(set) var currentTheme: PomodoroTheme = ThemeManager.getTheme(for: 0)
 
-    // MARK: - Timer interno
     private var ticker: Timer?
     private var startReferenceDate: Date?
     private var sessionStartedAt: Date?
     private var accumulatedElapsed: TimeInterval = 0
 
-    // MARK: - Persistencia
-    private let sessionsKey       = "freeMode.sessions"
-    private let musicFileNameKey  = "freeMode.musicFileName"
+    private let sessionsKey = "freeMode.sessions"
     private let defaults: UserDefaults
-    private static let musicFolderName = "FreeModeMusic"
+    private static let minSessionDuration: TimeInterval = 5 * 60
 
-    // MARK: - Init
+#if os(iOS) && canImport(ActivityKit)
+private var currentActivityId: String?
+#endif
+private var localCommandObserver: NSObjectProtocol?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         super.init()
         loadSessions()
-        restoreMusicIfPossible()
+
+        #if os(iOS)
+        // 1. Notificación Darwin (app en segundo plano / otro proceso)
+        let darwinNotification = "com.tomiirossi.PomodoroSense.WidgetCommand"
+        CFNotificationCenterAddObserver(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            Unmanaged.passUnretained(self).toOpaque(),
+            { (center, observer, name, object, userInfo) in
+                let vm = Unmanaged<FreeModeViewModel>.fromOpaque(observer!).takeUnretainedValue()
+                Task { @MainActor in vm.handleWidgetCommand() }
+            },
+            darwinNotification as CFString,
+            nil,
+            .deliverImmediately
+        )
+        #endif
+
+        // 2. Notificación local (app en primer plano). `PomodoroWidgetBridge.send` la postea
+        //    siempre; antes este VM no la escuchaba en iOS y por eso la isla no pausaba la app.
+        //    Si llegan las dos, la segunda no hace nada: la primera ya consumió el comando.
+        localCommandObserver = NotificationCenter.default.addObserver(forName: NSNotification.Name("WidgetCommandReceived"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.handleWidgetCommand() }
+        }
     }
 
-    // MARK: - Timer
+    deinit {
+        #if os(iOS)
+        CFNotificationCenterRemoveEveryObserver(CFNotificationCenterGetDarwinNotifyCenter(), Unmanaged.passUnretained(self).toOpaque())
+        #endif
+        if let obs = localCommandObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+        localCommandObserver = nil
+    }
 
     func toggleTimer() {
         isRunning ? pauseTimer() : startTimer()
@@ -69,6 +78,13 @@ final class FreeModeViewModel: NSObject, ObservableObject {
         startReferenceDate = Date()
         isRunning = true
         startTicker()
+
+        if noiseId != 0 || freqId != 0 {
+            AudioManager.shared.playBackground(noiseId: noiseId, freqId: freqId)
+        }
+
+        // Si ya hay una Live Activity, solo se actualiza. Si no, se crea.
+        startLiveActivity()
     }
 
     func pauseTimer() {
@@ -80,13 +96,15 @@ final class FreeModeViewModel: NSObject, ObservableObject {
         isRunning = false
         cancelTicker()
         elapsed = accumulatedElapsed
+        AudioManager.shared.pauseBackground()
+
+        updateLiveActivity()
     }
 
-    /// Detiene y guarda la sesión actual (si dura al menos 10s).
     @discardableResult
     func finishSession() -> FreeModeSession? {
         pauseTimer()
-        defer { stopMusic() }
+        defer { AudioManager.shared.stopBackground() }
 
         guard let startedAt = sessionStartedAt else {
             resetTimerState()
@@ -97,24 +115,18 @@ final class FreeModeViewModel: NSObject, ObservableObject {
 
         resetTimerState()
 
-        // Mínimo 10s para no ensuciar el historial con clicks accidentales.
-        guard duration >= 10 else { return nil }
+        guard duration >= Self.minSessionDuration else { return nil }
 
-        let session = FreeModeSession(
-            startedAt: startedAt,
-            endedAt: endedAt,
-            musicTitle: musicTitle
-        )
+        let session = FreeModeSession(startedAt: startedAt, endedAt: endedAt)
         sessions.insert(session, at: 0)
         persistSessions()
         return session
     }
 
-    /// Descarta la sesión actual sin guardar.
     func discardSession() {
         pauseTimer()
-        resetTimerState()
-        stopMusic()
+        resetTimerState()   // ya detiene la Live Activity
+        AudioManager.shared.stopBackground()
     }
 
     private func resetTimerState() {
@@ -124,20 +136,18 @@ final class FreeModeViewModel: NSObject, ObservableObject {
         sessionStartedAt = nil
         startReferenceDate = nil
         cancelTicker()
+        stopLiveActivity()
     }
 
-    /// Se llama al volver del background / reabrir la vista.
     func restartTickerIfNeeded() {
         guard isRunning, ticker == nil else { return }
         startTicker()
     }
 
-    // MARK: - Ticker
-
     private func startTicker() {
         cancelTicker()
         let t = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
+            Task { @MainActor [weak self] in self?.tick() }
         }
         t.tolerance = 0.1
         RunLoop.main.add(t, forMode: .common)
@@ -154,9 +164,6 @@ final class FreeModeViewModel: NSObject, ObservableObject {
         elapsed = accumulatedElapsed + Date().timeIntervalSince(ref)
     }
 
-    // MARK: - Formato
-
-    /// HH:MM:SS si hay horas, MM:SS si no.
     var formattedElapsed: String {
         let total = Int(elapsed)
         let h = total / 3600
@@ -168,130 +175,25 @@ final class FreeModeViewModel: NSObject, ObservableObject {
         return String(format: "%02d:%02d", m, s)
     }
 
-    // MARK: - Música
-
-    func importMusic(from url: URL) {
-        let needsAccess = url.startAccessingSecurityScopedResource()
-        defer { if needsAccess { url.stopAccessingSecurityScopedResource() } }
-
-        do {
-            let folder = try musicFolder()
-            let destName = url.lastPathComponent
-            let dest = folder.appendingPathComponent(destName)
-
-            if FileManager.default.fileExists(atPath: dest.path) {
-                try FileManager.default.removeItem(at: dest)
-            }
-            try FileManager.default.copyItem(at: url, to: dest)
-
-            defaults.set(destName, forKey: musicFileNameKey)
-            musicTitle = destName
-            prepareMusicPlayer(for: dest)
-        } catch {
-            print("[FreeMode] Error importando música: \(error)")
-        }
+    func updateNoiseId(_ id: Int) {
+        guard noiseId != id else { return }
+        noiseId = id
+        currentTheme = ThemeManager.getTheme(for: id)
+        if isRunning { AudioManager.shared.playBackground(noiseId: id, freqId: freqId) }
     }
 
-    func toggleMusic() {
-        guard let player = musicPlayer else { return }
-        if player.isPlaying {
-            player.pause()
-            isMusicPlaying = false
-        } else {
-            ensureSessionActive()
-            player.play()
-            isMusicPlaying = true
-        }
+    func updateFreqId(_ id: Int) {
+        guard freqId != id else { return }
+        freqId = id
+        if isRunning { AudioManager.shared.playBackground(noiseId: noiseId, freqId: id) }
     }
 
-    func stopMusic() {
-        musicPlayer?.stop()
-        musicPlayer?.currentTime = 0
-        isMusicPlaying = false
+    func updateNote(for sessionId: UUID, note: String?) {
+        guard let idx = sessions.firstIndex(where: { $0.id == sessionId }) else { return }
+        let trimmed = (note ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        sessions[idx].note = trimmed.isEmpty ? nil : trimmed
+        persistSessions()
     }
-
-    func removeMusic() {
-        musicPlayer?.stop()
-        musicPlayer = nil
-        musicTitle = nil
-        isMusicPlaying = false
-        defaults.removeObject(forKey: musicFileNameKey)
-    }
-
-    private func restoreMusicIfPossible() {
-        guard let name = defaults.string(forKey: musicFileNameKey),
-              let folder = try? musicFolder() else { return }
-        let url = folder.appendingPathComponent(name)
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            defaults.removeObject(forKey: musicFileNameKey)
-            return
-        }
-        musicTitle = name
-        prepareMusicPlayer(for: url)
-    }
-
-    private func prepareMusicPlayer(for url: URL) {
-        musicPlayer?.stop()
-        musicPlayer = nil
-        isMusicPlaying = false
-        do {
-            let player = try AVAudioPlayer(contentsOf: url)
-            player.numberOfLoops = 0            // sin loop
-            player.volume = musicVolume
-            player.delegate = self
-            player.prepareToPlay()
-            musicPlayer = player
-        } catch {
-            print("[FreeMode] Error preparando player: \(error)")
-        }
-    }
-
-    private func musicFolder() throws -> URL {
-        let docs = try FileManager.default.url(
-            for: .documentDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        let folder = docs.appendingPathComponent(Self.musicFolderName, isDirectory: true)
-        if !FileManager.default.fileExists(atPath: folder.path) {
-            try FileManager.default.createDirectory(
-                at: folder,
-                withIntermediateDirectories: true
-            )
-        }
-        return folder
-    }
-
-    private func ensureSessionActive() {
-        #if os(iOS)
-        try? AVAudioSession.sharedInstance().setActive(true)
-        #endif
-    }
-
-    // MARK: - SFX al terminar la música
-
-    private func playEndSFX() {
-        let candidates = ["focus_complete"]
-        for name in candidates {
-            if let url = ["m4a", "mp3", "wav"]
-                .compactMap({ Bundle.main.url(forResource: name, withExtension: $0) })
-                .first {
-                do {
-                    let p = try AVAudioPlayer(contentsOf: url)
-                    p.volume = 0.8
-                    p.prepareToPlay()
-                    p.play()
-                    sfxPlayer = p
-                } catch {
-                    print("[FreeMode] SFX error: \(error)")
-                }
-                return
-            }
-        }
-    }
-
-    // MARK: - Persistencia de historial
 
     private func loadSessions() {
         guard let data = defaults.data(forKey: sessionsKey),
@@ -314,15 +216,182 @@ final class FreeModeViewModel: NSObject, ObservableObject {
         sessions.removeAll()
         persistSessions()
     }
-}
 
-// MARK: - AVAudioPlayerDelegate
+    // MARK: - Live Activity
 
-extension FreeModeViewModel: AVAudioPlayerDelegate {
-    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor in
-            self.isMusicPlaying = false
-            self.playEndSFX()
+    /// Tiempo transcurrido "en vivo" (acumulado + tramo en curso), sin depender del ticker.
+    private var currentElapsed: TimeInterval {
+        accumulatedElapsed + (startReferenceDate.map { Date().timeIntervalSince($0) } ?? 0)
+    }
+
+    /// `targetDate` de Free Mode: ahora + 24h - transcurrido.
+    /// El widget calcula el inicio real como `targetDate - 24h`, así que debe descontar
+    /// lo ya transcurrido (antes siempre era ahora + 24h y al reanudar el reloj volvía a 0).
+    private func freeModeTargetDate() -> Date {
+        Date().addingTimeInterval(PomodoroLiveActivity.freeModeSpan - currentElapsed)
+    }
+
+    private func startLiveActivity() {
+        #if os(iOS) && canImport(ActivityKit)
+        guard #available(iOS 16.2, *) else { return }
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+        let state = PomodoroAttributes.ContentState(
+            isBreak: false,
+            currentSession: 1,
+            totalSessions: 1,
+            targetDate: freeModeTargetDate(),
+            noiseId: noiseId,
+            isRunning: true,
+            pausedSeconds: nil,
+            reward: nil,
+            isFreeMode: true
+        )
+        let content = ActivityContent(state: state, staleDate: nil)
+
+        // Si ya hay una Live Activity de Free Mode (la propia o una huérfana de otro arranque),
+        // solo se actualiza. Antes, con `currentActivityId == nil` se creaba una segunda isla.
+        if let existing = Activity<PomodoroAttributes>.activities.first(where: {
+            $0.id == currentActivityId || $0.content.state.isFreeMode
+        }) {
+            currentActivityId = existing.id
+            Task { await existing.update(content) }
+            return
+        }
+
+        do {
+            let attributes = PomodoroAttributes(presetName: "FREE MODE")
+            let activity = try Activity<PomodoroAttributes>.request(
+                attributes: attributes,
+                content: content,
+                pushType: nil
+            )
+            currentActivityId = activity.id
+        } catch {
+            print("Error starting Free Mode LA: \(error)")
+        }
+        #endif
+    }
+
+    private func updateLiveActivity() {
+        #if os(iOS) && canImport(ActivityKit)
+        guard #available(iOS 16.2, *) else { return }
+
+        // Estado calculado una sola vez, antes del Task, con los valores de este instante.
+        let state = PomodoroAttributes.ContentState(
+            isBreak: false,
+            currentSession: 1,
+            totalSessions: 1,
+            targetDate: freeModeTargetDate(),
+            noiseId: noiseId,
+            isRunning: isRunning,
+            pausedSeconds: isRunning ? nil : Int(currentElapsed),
+            reward: nil,
+            isFreeMode: true
+        )
+        let content = ActivityContent(state: state, staleDate: nil)
+
+        // Solo las Live Activities de Free Mode (nunca las de Pomodoro).
+        let ownId = currentActivityId
+        let freeActivities = Activity<PomodoroAttributes>.activities.filter {
+            $0.content.state.isFreeMode || $0.id == ownId
+        }
+        Task {
+            for activity in freeActivities {
+                await activity.update(content)
+            }
+        }
+        #endif
+    }
+
+    private func stopLiveActivity() {
+        #if os(iOS) && canImport(ActivityKit)
+        guard #available(iOS 16.2, *) else { return }
+        let ownId = currentActivityId
+        currentActivityId = nil
+        let freeActivities = Activity<PomodoroAttributes>.activities.filter {
+            $0.content.state.isFreeMode || $0.id == ownId
+        }
+        Task {
+            for activity in freeActivities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+        }
+        #endif
+    }
+
+    /// Si este VM arrancó "en blanco" (app relanzada, VM nuevo) pero la isla de Free Mode sigue viva,
+    /// la isla es la fuente de verdad: recuperamos el tiempo transcurrido desde ella.
+    /// Sin esto, un "pausar" desde la isla se convertía en "iniciar de cero" y parecía no hacer nada.
+    private func adoptLiveActivityIfNeeded() {
+        #if os(iOS) && canImport(ActivityKit)
+        guard #available(iOS 16.2, *) else { return }
+        guard sessionStartedAt == nil, !isRunning else { return }
+        guard let activity = Activity<PomodoroAttributes>.activities.first(where: { $0.content.state.isFreeMode })
+        else { return }
+
+        let state = activity.content.state
+        let recovered: TimeInterval = state.isRunning
+            ? PomodoroLiveActivity.freeModeSpan - state.targetDate.timeIntervalSinceNow
+            : TimeInterval(state.pausedSeconds ?? 0)
+
+        // Valor imposible (isla vieja o corrupta): no adoptamos.
+        guard recovered >= 0, recovered <= PomodoroLiveActivity.freeModeSpan else { return }
+
+        currentActivityId = activity.id
+        noiseId = state.noiseId
+        currentTheme = ThemeManager.getTheme(for: state.noiseId)
+        accumulatedElapsed = recovered
+        elapsed = recovered
+        sessionStartedAt = Date().addingTimeInterval(-recovered)
+
+        if state.isRunning {
+            startReferenceDate = Date()
+            isRunning = true
+            startTicker()
+            if noiseId != 0 || freqId != 0 {
+                AudioManager.shared.playBackground(noiseId: noiseId, freqId: freqId)
+            }
+        }
+        #endif
+    }
+
+    // MARK: - Widget Commands
+
+    func handleWidgetCommand() {
+        let defaults = PomodoroSessionStore.shared
+        guard let command = defaults.string(forKey: PomodoroWidgetBridge.commandKey) else { return }
+
+        // Sólo procesamos comandos de Free Mode. Si es de Pomodoro, lo dejamos
+        // intacto para que TimerViewModel lo tome.
+        let freeCommands: Set<WidgetCommand> = [.freeToggle, .freeStop, .freePause, .freeResume]
+        guard let cmd = WidgetCommand(rawValue: command), freeCommands.contains(cmd) else { return }
+
+        let sentAt = defaults.double(forKey: PomodoroWidgetBridge.commandDateKey)
+        defaults.removeObject(forKey: PomodoroWidgetBridge.commandKey)
+        defaults.removeObject(forKey: PomodoroWidgetBridge.commandDateKey)
+
+        guard sentAt > 0,
+              Date().timeIntervalSince1970 - sentAt < PomodoroWidgetBridge.commandTTL else {
+            #if DEBUG
+            print("🟣 [Free] \(command) descartado por TTL")
+            #endif
+            return
+        }
+
+        #if DEBUG
+        print("🟣 [Free] \(command) — VM corriendo: \(isRunning), transcurrido: \(Int(currentElapsed))s")
+        #endif
+
+        // El STOP no necesita recuperar nada; el resto sí, por si el VM arrancó en blanco.
+        if cmd != .freeStop { adoptLiveActivityIfNeeded() }
+
+        switch cmd {
+        case .freeToggle: toggleTimer()
+        case .freePause:  pauseTimer()    // idempotente: si ya estaba en pausa, no hace nada
+        case .freeResume: startTimer()    // idempotente: si ya estaba corriendo, no hace nada
+        case .freeStop:   finishSession()
+        default:          break
         }
     }
 }

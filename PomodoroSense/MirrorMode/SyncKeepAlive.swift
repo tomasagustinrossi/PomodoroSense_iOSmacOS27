@@ -2,6 +2,14 @@
 //  SyncKeepAlive.swift
 //  PomodoroSense
 //
+//  Created by Tomas Rossi on 17/10/2026.
+//
+
+
+//
+//  SyncKeepAlive.swift
+//  PomodoroSense
+//
 //  Mantiene viva la app en segundo plano (solo iOS) mientras hay una sesión de sync
 //  Master/Mirror activa, para que el socket siga entregando mensajes y la Live Activity
 //  se actualice en el momento.
@@ -27,6 +35,9 @@ final class SyncKeepAlive {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private var graphBuilt = false
+    /// Buffer de silencio. Se vuelve a programar en cada arranque: no dependemos de que
+    /// el player conserve su cola después de `engine.stop()`.
+    private var silence: AVAudioPCMBuffer?
     private var observers: [NSObjectProtocol] = []
     #endif
 
@@ -56,20 +67,29 @@ final class SyncKeepAlive {
         }
 
         engine.attach(player)
-        engine.connect(player, to: engine.mainMixerNode, format: format)
-        player.scheduleBuffer(buffer, at: nil, options: .loops)
+        do {
+            // iOS/macOS 27: `connect(_:to:format:)` quedó deprecado; la versión nueva lanza.
+            try engine.connectNode(player, to: engine.mainMixerNode, format: format)
+        } catch {
+            print("⚠️ [KeepAlive] no pudo conectar el grafo: \(error.localizedDescription)")
+            engine.detach(player)
+            return
+        }
+        silence = buffer
 
         // Si el sistema reconfigura el audio (cambio de ruta, llamada…), reiniciamos.
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: .AVAudioEngineConfigurationChange,
                                             object: engine, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.restartIfRequested() }
+            Task { @MainActor [weak self] in self?.restartIfRequested() }
         })
-        observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification,
-                                            object: nil, queue: .main) { [weak self] note in
-            let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
-            guard raw == AVAudioSession.InterruptionType.ended.rawValue else { return }
-            Task { @MainActor in self?.restartIfRequested() }
+        // iOS 27: `interruptionNotification` (y `InterruptionType`) quedó deprecada. La nueva
+        // `resumptionRecommendationNotification` se publica cuando termina una interrupción.
+        // Reiniciamos siempre (como antes con `.ended`): el keep-alive es silencio, no hay
+        // motivo para respetar un "shouldNotResume" pensado para audio audible.
+        observers.append(center.addObserver(forName: AVAudioSession.resumptionRecommendationNotification,
+                                            object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.restartIfRequested() }
         })
 
         graphBuilt = true
@@ -82,12 +102,19 @@ final class SyncKeepAlive {
             guard requested else { return }   // lo apagaron mientras activábamos la sesión
 
             buildGraphIfNeeded()
+            guard graphBuilt else { return }
             do {
                 if !engine.isRunning {
                     engine.prepare()
                     try engine.start()
                 }
-                if !player.isPlaying { player.play() }
+                if !player.isPlaying {
+                    // Cola limpia + silencio en loop: evita acumular buffers duplicados.
+                    player.stop()
+                    scheduleSilenceLoop()
+                    // iOS/macOS 27: `play()` quedó deprecado; la versión nueva lanza.
+                    try player.playAudio()
+                }
                 #if DEBUG
                 print("🫀 [KeepAlive] activo")
                 #endif
@@ -97,8 +124,17 @@ final class SyncKeepAlive {
         }
     }
 
+    /// Función SÍNCRONA a propósito: dentro de un `Task`/contexto async, Swift elegiría la
+    /// variante `async` de `scheduleBuffer`, que no retorna hasta que el buffer termina de
+    /// sonar (con `.loops`, nunca) y colgaría el arranque. Con `completionHandler:` explícito
+    /// se usa siempre la versión con callback.
+    private func scheduleSilenceLoop() {
+        guard let silence else { return }
+        player.scheduleBuffer(silence, at: nil, options: .loops, completionHandler: nil)
+    }
+
     private func stop() {
-        player.pause()
+        player.stop()
         if engine.isRunning { engine.stop() }
         #if DEBUG
         print("🫀 [KeepAlive] detenido")

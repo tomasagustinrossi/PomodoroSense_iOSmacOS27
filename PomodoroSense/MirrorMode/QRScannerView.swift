@@ -1,3 +1,11 @@
+//
+//  QRScannerView.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 15/10/2026.
+//
+
+
 #if os(iOS)
 import SwiftUI
 import AVFoundation
@@ -19,6 +27,7 @@ final class QRScannerController: UIViewController, AVCaptureMetadataOutputObject
     var onScan: ((String) -> Void)?
     var onCancel: (() -> Void)?
     private var captureSession: AVCaptureSession?
+    private var previewLayer: AVCaptureVideoPreviewLayer?
     private var hasScanned = false
 
     override func viewDidLoad() {
@@ -29,10 +38,11 @@ final class QRScannerController: UIViewController, AVCaptureMetadataOutputObject
 
     private func setupSession() {
         guard let device = AVCaptureDevice.default(for: .video),
-              let input = try? AVCaptureDeviceInput(device: device),
-              let session = try? AVCaptureSession() as AVCaptureSession? else {
+              let input = try? AVCaptureDeviceInput(device: device) else {
             onCancel?(); return
         }
+        // `AVCaptureSession()` no lanza: antes iba dentro de un `try?` que no hacía nada.
+        let session = AVCaptureSession()
         session.sessionPreset = .high
         guard session.canAddInput(input) else { onCancel?(); return }
         session.addInput(input)
@@ -47,9 +57,16 @@ final class QRScannerController: UIViewController, AVCaptureMetadataOutputObject
         preview.frame = view.bounds
         preview.videoGravity = .resizeAspectFill
         view.layer.addSublayer(preview)
+        previewLayer = preview
 
         captureSession = session
         DispatchQueue.global(qos: .userInitiated).async { session.startRunning() }
+    }
+
+    /// Sin esto el preview queda con el tamaño inicial al rotar (iPad) o cambiar el layout.
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        previewLayer?.frame = view.bounds
     }
 
     func metadataOutput(_ output: AVCaptureMetadataOutput,

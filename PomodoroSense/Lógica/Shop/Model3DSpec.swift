@@ -1,12 +1,4 @@
 //
-//  Model3DSpec.swift
-//  PomodoroSense
-//
-//  Created by Tomas Rossi on 18/10/2026.
-//
-
-
-//
 //  Model3DView.swift
 //  PomodoroSense
 //
@@ -44,15 +36,20 @@ enum Model3DFactory {
         let rig = Rig()
 
         scene.lightingEnvironment.contents = environment
-        scene.lightingEnvironment.intensity = 1.5
+        scene.lightingEnvironment.intensity = 1.1
 
         let cam = SCNNode()
         cam.camera = SCNCamera()
         cam.camera?.fieldOfView = 38
+        // Oclusión ambiental: oscurece rincones y paredes interiores (efecto "hundido")
+        cam.camera?.screenSpaceAmbientOcclusionIntensity = 1.4
+        cam.camera?.screenSpaceAmbientOcclusionRadius = 0.45
+        cam.camera?.screenSpaceAmbientOcclusionBias = 0.03
         cam.position = vec3(0, 0, 4.0)
         scene.rootNode.addChildNode(cam)
 
-        func addLight(_ color: CGColor, _ intensity: CGFloat, _ x: Double, _ y: Double) {
+        @discardableResult
+        func addLight(_ color: CGColor, _ intensity: CGFloat, _ x: Double, _ y: Double) -> SCNLight {
             let l = SCNLight()
             l.type = .directional
             l.color = color
@@ -61,8 +58,16 @@ enum Model3DFactory {
             n.light = l
             n.eulerAngles = vec3(x, y, 0)
             scene.rootNode.addChildNode(n)
+            return l
         }
-        addLight(CGColor(red: 1, green: 0.96, blue: 0.9, alpha: 1), 900, -.pi / 4, -.pi / 5)  // key
+        let key = addLight(CGColor(red: 1, green: 0.96, blue: 0.9, alpha: 1), 1000, -.pi / 4, -.pi / 5)  // key
+        // Sombras reales: el marco proyecta sombra sobre las barras y las paredes interiores
+        key.castsShadow = true
+        key.shadowMode = .deferred
+        key.shadowRadius = 5
+        key.shadowSampleCount = 8
+        key.shadowColor = CGColor(gray: 0, alpha: 0.75)
+        key.shadowMapSize = CGSize(width: 2048, height: 2048)
         addLight(CGColor(red: 0.85, green: 0.92, blue: 1, alpha: 1), 300, .pi / 5, .pi / 3)   // fill
         addLight(CGColor(gray: 1, alpha: 1), 500, .pi / 6, .pi * 0.8)                         // rim
 
@@ -155,6 +160,7 @@ struct Model3DView: View {
     var size: CGFloat = 220
     var autoRotate: Bool = true
     var interactive: Bool = true
+    var straight: Bool = false
 
     @State private var yaw: Double = -0.55
     @State private var pitch: Double = 0.18
@@ -173,7 +179,15 @@ struct Model3DView: View {
             .allowsHitTesting(interactive)      // si no es interactivo, el tap llega al Button padre
             .gesture(interactive ? dragGesture : nil)
             .onChange(of: spec) { _, _ in
-                yaw = -0.55; pitch = 0.18; hasInteracted = false
+                yaw = straight ? 0 : -0.55
+                pitch = straight ? 0 : 0.18
+                hasInteracted = false
+            }
+            .onAppear {
+                if straight {
+                    yaw = 0
+                    pitch = 0
+                }
             }
     }
 

@@ -1,4 +1,12 @@
 //
+//  MarkPresetInvalidatedTests.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 14/10/2026.
+//
+
+
+//
 //  PresetRunTests.swift
 //  PomodoroSenseTests
 //
@@ -71,7 +79,7 @@ struct MarkPresetInvalidatedTests {
     }
 
     @Test("No toca records de otras corridas")
-    func doesn'tTouchOtherRuns() {
+    func doesntTouchOtherRuns() {
         let (defaults, suite) = makeIsolatedDefaults()
         defer { cleanupDefaults(suite) }
 
@@ -209,7 +217,7 @@ struct ReassignPresetToDateTests {
     }
 
     @Test("No toca records de otras corridas")
-    func doesn'tTouchOtherRuns() {
+    func doesntTouchOtherRuns() {
         let (defaults, suite) = makeIsolatedDefaults()
         defer { cleanupDefaults(suite) }
 

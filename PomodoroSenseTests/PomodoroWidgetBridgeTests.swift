@@ -1,5 +1,13 @@
 //
 //  PomodoroWidgetBridgeTests.swift
+//  PomodoroSense
+//
+//  Created by Tomas Rossi on 12/10/2026.
+//
+
+
+//
+//  PomodoroWidgetBridgeTests.swift
 //  PomodoroSenseTests
 //
 

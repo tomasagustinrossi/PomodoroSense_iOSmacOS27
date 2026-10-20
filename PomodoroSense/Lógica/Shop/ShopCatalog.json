@@ -1,0 +1,163 @@
+[
+  {
+    "id": "bronze.chip_pack",
+    "category": "bronze",
+    "name": "Chip",
+    "description": "Just an expensive chip.",
+    "cost": 10,
+    "symbol": "cube",
+    "type": "symbol"
+  },
+  {
+    "id": "bronze.rosette",
+    "category": "bronze",
+    "name": "Rosette",
+    "description": "A simple emblem.",
+    "cost": 50,
+    "symbol": "rosette",
+    "type": "symbol"
+  },
+  {
+    "id": "bronze.leaf",
+    "category": "bronze",
+    "name": "Leaf",
+    "description": "Grow your focus one session at a time.",
+    "cost": 100,
+    "symbol": "leaf",
+    "type": "symbol"
+  },
+  {
+    "id": "bronze.moon",
+    "category": "bronze",
+    "name": "Moon",
+    "description": "Find your quiet focus.",
+    "cost": 200,
+    "symbol": "moon",
+    "type": "symbol"
+  },
+  {
+    "id": "bronze.bolt",
+    "category": "bronze",
+    "name": "Bolt",
+    "description": "Keep in the momentum.",
+    "cost": 400,
+    "symbol": "bolt",
+    "type": "symbol"
+  },
+  {
+    "id": "bronze.hourglass",
+    "category": "bronze",
+    "name": "Hourglass",
+    "description": "Make every focused minute count.",
+    "cost": 600,
+    "symbol": "hourglass",
+    "type": "symbol"
+  },
+  {
+    "id": "bronze.mountain",
+    "category": "bronze",
+    "name": "Mountain",
+    "description": "One step closer to your goals.",
+    "cost": 800,
+    "symbol": "mountain.2",
+    "type": "symbol"
+  },
+  {
+    "id": "bronze.star",
+    "category": "bronze",
+    "name": "Star",
+    "description": "Celebrate every small achievement.",
+    "cost": 1000,
+    "symbol": "star",
+    "type": "symbol"
+  },
+  {
+    "id": "silver.eye",
+    "category": "silver",
+    "name": "Vision",
+    "description": "Keep your attention on what matters.",
+    "cost": 5,
+    "symbol": "eye",
+    "type": "symbol"
+  },
+  {
+    "id": "silver.diamond",
+    "category": "silver",
+    "name": "Diamond",
+    "description": "Sharpen your focus with a rare symbol.",
+    "cost": 10,
+    "symbol": "diamond",
+    "type": "symbol"
+  },
+  {
+    "id": "silver.snowflake",
+    "category": "silver",
+    "name": "Snowflake",
+    "description": "Stay cool under pressure.",
+    "cost": 20,
+    "symbol": "snowflake",
+    "type": "symbol"
+  },
+  {
+    "id": "silver.moonstars",
+    "category": "silver",
+    "name": "Moonlit Sky",
+    "description": "A reminder to stay calm and consistent.",
+    "cost": 50,
+    "symbol": "moon.stars",
+    "type": "symbol"
+  },
+  {
+    "id": "silver.sparkles",
+    "category": "silver",
+    "name": "Sparkles",
+    "description": "Bring a little brilliance to your routine.",
+    "cost": 150,
+    "symbol": "sparkles",
+    "type": "symbol"
+  },
+  {
+    "id": "gold.crown",
+    "category": "gold",
+    "name": "Royal Crown",
+    "description": "A symbol of mastery earned through consistency.",
+    "cost": 3,
+    "symbol": "crown",
+    "type": "symbol"
+  },
+  {
+    "id": "gold.coffee",
+    "category": "gold",
+    "name": "Golden Coffee",
+    "description": "The signature ritual of a dedicated focus master.",
+    "cost": 5,
+    "symbol": "cup.and.saucer.fill",
+    "type": "symbol"
+  },
+  {
+    "id": "gold.flame",
+    "category": "gold",
+    "name": "Eternal Flame",
+    "description": "Represent an unwavering commitment to focus.",
+    "cost": 20,
+    "symbol": "flame.fill",
+    "type": "symbol"
+  },
+  {
+    "id": "gold.nike",
+    "category": "gold",
+    "name": "Nike",
+    "description": "Just.. do it.",
+    "cost": 100,
+    "image": "ShopItems/gold/nike.png"
+  },
+  {
+    "id": "gold.infinity",
+    "category": "gold",
+    "name": "Infinity",
+    "description": "Supreme individual unique object.",
+    "cost": 500,
+    "symbol": "infinity",
+    "type": "symbol"
+  }
+]
