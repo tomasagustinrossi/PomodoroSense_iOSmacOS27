@@ -68,10 +68,15 @@ enum PomodoroLiveActivity {
     /// DEBEN usar este mismo valor.
     static let freeModeSpan: TimeInterval = 24 * 3600
 
-    /// Cierra todas las Live Activities de Pomodoro. No hace nada fuera de iOS.
-    static func endAll() async {
+    /// Cierra Live Activities. Por defecto, TODAS (Pomodoro + Free Mode).
+    /// - Parameter freeMode: `nil` = todas; `false` = solo Pomodoro; `true` = solo Free Mode.
+    static func endAll(freeMode: Bool? = nil) async {
         #if os(iOS)
         for activity in Activity<PomodoroAttributes>.activities {
+            guard LiveActivityFilter.shouldEndAll(
+                isFreeMode: activity.content.state.isFreeMode,
+                filter: freeMode
+            ) else { continue }
             await activity.end(nil, dismissalPolicy: .immediate)
         }
         #endif
@@ -201,9 +206,9 @@ struct DismissRewardIntent: BaseTimerIntent {
     static let title: LocalizedStringResource = "Dismiss Reward"
 
     func perform() async throws -> some IntentResult {
-        // Solo cierra las Live Activities. NO toca el timer ni el estado
-        // de la app (a diferencia de StopTimerIntent).
-        await PomodoroLiveActivity.endAll()
+        // Solo cierra las Live Activities de Pomodoro. NO toca el timer
+        // ni la isla de Free Mode si hubiera una.
+        await PomodoroLiveActivity.endAll(freeMode: false)
         return .result()
     }
 }
@@ -220,8 +225,8 @@ struct StopTimerIntent: BaseTimerIntent {
             PomodoroWidgetBridge.send(.stop)
         }
 
-        // 3. Limpieza de Live Activities.
-        await PomodoroLiveActivity.endAll()
+        // 3. Solo la isla de Pomodoro: Free Mode tiene su propio STOP.
+        await PomodoroLiveActivity.endAll(freeMode: false)
 
         return .result()
     }
@@ -282,7 +287,7 @@ struct StopFreeModeIntent: BaseTimerIntent {
             PomodoroWidgetBridge.send(.freeStop)
         }
 
-        await PomodoroLiveActivity.endAll()
+        await PomodoroLiveActivity.endAll(freeMode: true)
 
         return .result()
     }

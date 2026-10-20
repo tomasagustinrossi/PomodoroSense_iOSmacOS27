@@ -1134,7 +1134,13 @@ class TimerViewModel: ObservableObject {
         let content = ActivityContent(state: state, staleDate: nil)
 
         let activeActivities = Activity<PomodoroAttributes>.activities
-            .filter { $0.activityState == .active && !$0.content.state.isFreeMode }
+            .filter {
+                LiveActivityFilter.isReusablePomodoro(
+                    isActive: $0.activityState == .active,
+                    isStale: $0.activityState == .stale,
+                    isFreeMode: $0.content.state.isFreeMode
+                )
+            }
 
         #if DEBUG
         print("🎬 [LA] startLiveActivity — activas: \(activeActivities.count), knownId: \(currentActivityId ?? "nil")")
@@ -1186,7 +1192,11 @@ class TimerViewModel: ObservableObject {
         currentActivityId = nil
 
         Task {
-            for activity in Activity<PomodoroAttributes>.activities {
+            for activity in Activity<PomodoroAttributes>.activities
+            where LiveActivityFilter.shouldEndAll(
+                isFreeMode: activity.content.state.isFreeMode,
+                filter: false
+            ) {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
         }
