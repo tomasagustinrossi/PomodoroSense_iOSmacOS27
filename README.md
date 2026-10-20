@@ -1,7 +1,7 @@
 <h1 align="center">PomodoroSense PreRelease</h1>
 
 <p align="center">
-  <em>A focus timer for Apple devices. Private, native, quietly rewarding.</em>
+  <em>A focus timer for Apple devices. Private, native, with a small reward system that stays out of your way.</em>
 </p>
 
 <p align="center">
@@ -29,16 +29,16 @@
 </p>
 
 <p align="center">
-  <img src="Screenshots/pomodorosense-hero-card.png" width="820" alt="PomodoroSense — focus timer, audio, live activity and shop">
+  <img src="Screenshots/pomodorosense-hero-card.png" width="820" alt="PomodoroSense: focus timer, audio, live activity and shop">
   <br>
   <sub><i><!-- TODO: add hero image (main timer screenshot, 820×460) --></i></sub>
 </p>
 
 ---
 
-**PomodoroSense** is a Pomodoro timer for iOS and macOS that combines deep focus sessions with a quiet progression system, a fully procedural audio engine, and a peer-to-peer Mirror Mode that keeps two devices in sync — without ever touching a server.
+**PomodoroSense** is a Pomodoro timer for iOS and macOS. It has focus sessions, a simple progression system, an audio engine that generates everything in real time, and a Mirror Mode that keeps two devices in sync without going through any server.
 
-It is designed to feel like a native Apple app first: spring-based animations, consistent haptics, adaptive themes per soundscape, and native Live Activities, Home Screen widgets, and desktop widgets.
+I wanted it to feel like a real Apple app: spring animations, consistent haptics, a different color theme for each soundscape, and Live Activities and widgets on both the iPhone and the Mac desktop.
 
 ---
 
@@ -46,15 +46,15 @@ It is designed to feel like a native Apple app first: spring-based animations, c
 
 - [Why PomodoroSense](#why-pomodorosense)
 - [Features](#features)
-  - [Focus Timer](#-focus-timer)
-  - [Free Mode](#-free-mode)
-  - [Audio Engine](#-audio-engine)
-  - [Live Activities & Widgets](#-live-activities--widgets)
-  - [Mirror Mode](#-mirror-mode)
-  - [Economy & Streaks](#-economy--streaks)
-  - [Shop](#-shop)
-  - [Calendar & Stats](#-calendar--stats)
-  - [Design](#-design)
+  - [Focus Timer](#focus-timer)
+  - [Free Mode](#free-mode)
+  - [Audio Engine](#audio-engine)
+  - [Live Activities & Widgets](#live-activities--widgets)
+  - [Mirror Mode](#mirror-mode)
+  - [Economy & Streaks](#economy--streaks)
+  - [Shop](#shop)
+  - [Calendar & Stats](#calendar--stats)
+  - [Design](#design)
 - [Screenshots](#screenshots)
 - [Installation](#installation)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
@@ -71,102 +71,102 @@ It is designed to feel like a native Apple app first: spring-based animations, c
 
 ## Why PomodoroSense
 
-Most Pomodoro apps are either **too simple** or **too social**. PomodoroSense is what you get when you build a focus timer for yourself first:
+Most Pomodoro apps I tried were either too basic or too social. This is the one I built for myself, which explains a few of the choices:
 
-- **Native on iOS and macOS.** Not a port, not a web wrapper. SwiftUI all the way down, with platform-specific experiences where it matters (menu bar app on Mac, Dynamic Island on iPhone).
-- **No account, no cloud, no telemetry.** Mirror Mode syncs over your local network with end-to-end encryption. Your focus data never leaves your devices.
-- **A quiet economy.** Earn chips for finishing sessions. Build a streak. Unlock something new. The rewards are real, the loop is gentle, and the math is tuned so it never feels like a slot machine.
-- **Audio you actually want to hear.** Procedural noise, binaural beats, and ambient soundscapes, each with its own carefully-tuned volume curve.
-- **Crafted, not cobbled.** HIG-aligned motion, contextual haptics, per-sound adaptive color themes.
+- **Native on iOS and macOS.** It's not a port or a web wrapper. Everything is SwiftUI, with platform-specific pieces where they make sense: a menu bar app on Mac and the Dynamic Island on iPhone.
+- **No account, no cloud, no telemetry.** Mirror Mode syncs over your local network with end-to-end encryption. Your focus data stays on your devices.
+- **A calm economy.** Finish sessions and you earn chips. Keep a streak and you unlock new things. The rewards are real, the loop is gentle, and the numbers are tuned so it never turns into a slot machine.
+- **Audio you can live with.** Procedural noise, binaural beats and ambient soundscapes, each with its own volume curve.
+- **Attention to detail.** HIG-aligned motion, haptics that match the context, and colors that change with each sound.
 
 ---
 
 ## Features
 
-### ⏱ Focus Timer
+### Focus Timer
 
-- **Custom presets**: focus length, break length, and number of sessions, fully configurable.
-- **In-session controls**: pause, resume, skip forward, skip backward, and reset — from the app, the widget, or the Live Activity.
-- **Session selection**: jump to any session inside the current preset by tapping the session bar.
-- **State restoration**: if the app is killed, an interrupted session is preserved and resumed on relaunch (configurable).
-- **Smart phase transitions**: focus → break → focus → … → done, with automatic cross-midnight handling (a preset that starts at 23:50 and finishes at 00:20 counts entirely for the day it ended).
+- **Custom presets.** Set the focus length, the break length and the number of sessions.
+- **In-session controls.** Pause, resume, skip forward, skip backward and reset, from the app, the widget or the Live Activity.
+- **Session selection.** Tap the session bar to jump to any session in the current preset.
+- **State restoration.** If the system kills the app, the interrupted session is saved and picked up again on relaunch (this can be turned off).
+- **Phase transitions.** The cycle goes focus, break, focus and so on until it's done. It also handles midnight: a preset that starts at 23:50 and ends at 00:20 counts fully for the day it ended.
 
-### ♾ Free Mode
+### Free Mode
 
-- **Unlimited timer** with no structure: start, pause, stop.
-- Ideal for deep work sessions that don't fit a Pomodoro pattern.
-- **Session history** with duration, time range, and optional notes.
-- **Full audio support** (noise, binaural, ambient) — same engine as Pomodoro, isolated session.
+- **An unlimited timer** with no structure: start, pause, stop.
+- Good for deep work that doesn't fit a Pomodoro pattern.
+- **Session history** with duration, time range and optional notes.
+- **Full audio support** (noise, binaural, ambient). It uses the same engine as Pomodoro, in a separate session.
 
-### 🎧 Audio Engine
+### Audio Engine
 
-- **Procedural noise** generated in real time on the audio thread: brown, pink, white, violet.
+- **Procedural noise** generated in real time on the audio thread: brown, pink, white and violet.
 - **Binaural beats** with a 432 Hz carrier:
-  - Gamma (40 Hz) — peak focus
-  - Beta (15 Hz) — active concentration
-  - Alpha (10 Hz) — relaxed alertness
-  - Theta (6 Hz) — deep calm
-- **Ambient soundscapes**: nature, rain, ocean, classical music, fireplace.
-- **Per-source volume** with smooth exponential curves, fade-in / fade-out on play, pause, and stop.
-- **Independent mixing**: binaural, noise, and ambience can all play simultaneously.
-- **Real-time equalizer** in the app to adjust each source on the fly.
-- **Background audio**: continues while the app is in the background (required `UIBackgroundModes: audio`).
+  - Gamma (40 Hz) for peak focus
+  - Beta (15 Hz) for active concentration
+  - Alpha (10 Hz) for relaxed alertness
+  - Theta (6 Hz) for deep calm
+- **Ambient soundscapes:** nature, rain, ocean, classical music and fireplace.
+- **Per-source volume** with smooth exponential curves, plus fade-in and fade-out when you play, pause or stop.
+- **Independent mixing.** Binaural, noise and ambience can all play at once.
+- **Real-time equalizer** in the app, so you can adjust each source as you go.
+- **Background audio.** It keeps playing while the app is in the background (this needs `UIBackgroundModes: audio`).
 
-### 📱 Live Activities & Widgets
+### Live Activities & Widgets
 
-- **Dynamic Island** (iPhone) with live countdown, phase label, session progress, and controls: pause, resume, skip, stop.
-- **Lock Screen Live Activity** with the same controls plus a larger clock.
-- **Home Screen widget** (iOS) and **desktop widget** (macOS) showing the current timer, chips balance, and streak.
-- **Reward panel**: when a session completes, the Live Activity transforms into a compact reward summary (chips earned, streak update).
-- **Smart deduplication**: updates are only sent when the state actually changes, so the ActivityKit system never drops frames.
-- **Foreground retry**: if iOS blocked the initial `Activity.request` while the app was in the background, the Live Activity is automatically retried when you return to the app.
+- **Dynamic Island** (iPhone) with a live countdown, the phase label, session progress, and controls for pause, resume, skip and stop.
+- **Lock Screen Live Activity** with the same controls and a bigger clock.
+- **Home Screen widget** (iOS) and **desktop widget** (macOS) showing the current timer, your chips balance and your streak.
+- **Reward panel.** When a session completes, the Live Activity turns into a compact summary with the chips earned and the streak update.
+- **Update deduplication.** An update is only sent when the state really changes, so ActivityKit doesn't drop frames.
+- **Foreground retry.** If iOS blocked the first `Activity.request` while the app was in the background, the Live Activity is requested again when you come back to the app.
 
-### 🔗 Mirror Mode
+### Mirror Mode
 
-- **Peer-to-peer sync** between two devices over the local network.
-- **No cloud, no account, no server.** Pairing uses a shared key derived from a 16-character code (shown as QR or copy-paste), transmitted over TLS-PSK.
-- **Master / Mirror roles** negotiated automatically by the connection handshake.
-- **Automatic reconnection** with state reconciliation — if the connection drops, both sides resume without losing the active session.
-- **Full control from either side**: pause, resume, skip, stop — mirrored in real time.
-- **Live Activity on the Mirror**: the Mirror shows the Master's timer in its own Dynamic Island, updated in real time while the app is in the foreground.
+- **Peer-to-peer sync** between two devices on the local network.
+- **No cloud, no account, no server.** Pairing uses a shared key derived from a 16-character code (shown as a QR or as text you can copy), sent over TLS-PSK.
+- **Master / Mirror roles** that get negotiated automatically in the connection handshake.
+- **Automatic reconnection** with state reconciliation. If the connection drops, both sides carry on without losing the active session.
+- **Control from either side.** Pause, resume, skip and stop show up on the other device in real time.
+- **Live Activity on the Mirror.** The Mirror shows the Master's timer in its own Dynamic Island, updated live while the app is in the foreground.
 
-> Mirror Mode is designed for the common case: your iPhone and your Mac, or two iPhones on the same Wi-Fi, with no setup beyond scanning a QR.
+> Mirror Mode is built for the most common case: your iPhone and your Mac, or two iPhones on the same Wi-Fi, with nothing to set up beyond scanning a QR.
 
-### 🏆 Economy & Streaks
+### Economy & Streaks
 
-- **Daily streaks** with an exponential multiplier — the longer you keep the habit, the more each session is worth.
-- **Chips**: earned for every completed focus session, with a soft cap that scales with your streak.
-- **Session quality multipliers**: longer focus sessions earn more per minute than shorter ones.
-- **Lucky sessions**: rare bonuses on longer sessions that keep the economy interesting without feeling random.
-- **Daily soft caps** on every currency to prevent grind, keep the balance meaningful, and preserve the streak as the primary signal.
-- **Prestige progression**: as your streak grows, new item tiers unlock in the shop (the details are a surprise — discover them by playing).
-- **Tier unlock popups**: a moment of celebration when a new milestone is reached.
+- **Daily streaks** with an exponential multiplier. The longer you keep the habit, the more each session is worth.
+- **Chips** for every completed focus session, with a soft cap that grows with your streak.
+- **Session quality multipliers.** Longer focus sessions pay more per minute than short ones.
+- **Lucky sessions.** Occasional bonuses on longer sessions that keep the economy interesting without feeling random.
+- **Soft daily caps** on every currency, to prevent grinding, keep the balance meaningful and let the streak stay the main signal.
+- **Prestige progression.** As your streak grows, new item tiers unlock in the shop. The details are a surprise, so you'll have to play to find them.
+- **Tier unlock popups** that celebrate each new milestone.
 
-### 🛍 Shop
+### Shop
 
-- **3D items** rendered in SceneKit with per-tier metallic materials (bronze, silver, and higher).
-- **Multiple visual sources**: SF Symbols, PNG/JPG images, and full `.usdz` models.
-- **Procedural extrusion**: image-based items are extruded from their alpha silhouette with a beveled edge and proper hole handling.
-- **Rotating previews** on the item detail popup with drag-to-rotate.
-- **Persistent collection**: purchased items stay in your collection forever.
-- **"My Collection" view**: a curated gallery of everything you own, with 3D previews.
+- **3D items** rendered with SceneKit, using metallic materials per tier (bronze, silver and higher).
+- **Several visual sources:** SF Symbols, PNG/JPG images and full `.usdz` models.
+- **Procedural extrusion.** Image-based items are extruded from their alpha silhouette, with a beveled edge and correct handling of holes.
+- **Rotating previews** in the item detail popup, with drag to rotate.
+- **Persistent collection.** Whatever you buy stays yours.
+- **"My Collection" view:** a gallery of everything you own, with 3D previews.
 
-### 📅 Calendar & Stats
+### Calendar & Stats
 
-- **Focus heatmap** of the last 90 days, colored by session intensity.
-- **Adaptive color tiers**: thresholds are recalculated from the last 30 days using percentiles, so the calendar self-calibrates to your pace.
-- **Daily goals**: set a goal for any day, track completion with a star, and see focus time accumulated toward each goal.
-- **Day detail popup**: tap any day to see the full session list (focus minutes, break minutes, total sessions) and manage that day's goal.
-- **Monthly reports**: records older than 90 days are automatically compacted into monthly summaries, keeping the app lightweight without losing history.
-- **Wallet summary**: chips, silver, and streak totals at a glance.
+- **Focus heatmap** of the last 90 days, colored by how intense each day was.
+- **Adaptive color tiers.** The thresholds are recalculated from the last 30 days using percentiles, so the calendar adjusts to your own pace.
+- **Daily goals.** Set a goal for any day, mark it with a star when you hit it, and see how much focus time you've logged toward it.
+- **Day detail popup.** Tap any day to see its full session list (focus minutes, break minutes, total sessions) and manage that day's goal.
+- **Monthly reports.** Records older than 90 days are compacted automatically into monthly summaries, so the app stays light and you keep your history.
+- **Wallet summary** with chips, silver and streak totals at a glance.
 
-### 🎨 Design
+### Design
 
-- **Adaptive themes**: each ambient soundscape has its own color palette for focus and break phases.
-- **Spring-based motion** everywhere (no linear easing).
-- **Contextual haptics** on iOS: press, release, success, warning, error.
-- **Native macOS experience**: menu bar app with live timer label, keyboard-driven navigation, Dock bounce on phase change.
-- **Multi-platform, single codebase**: shared models, shared view models, platform-specific views.
+- **Adaptive themes.** Each ambient soundscape has its own palette for focus and break phases.
+- **Spring-based motion** throughout, with no linear easing.
+- **Contextual haptics** on iOS: press, release, success, warning and error.
+- **Native macOS experience:** a menu bar app with a live timer label, keyboard navigation and a Dock bounce on every phase change.
+- **Multi-platform, one codebase.** Models and view models are shared, and the views are specific to each platform.
 
 ---
 
@@ -199,7 +199,7 @@ Most Pomodoro apps are either **too simple** or **too social**. PomodoroSense is
 ### Requirements
 
 - **iOS 17.0+** or **macOS 14.0+**
-- Xcode 16.0+ (for building from source)
+- Xcode 16.0+ (to build from source)
 - Swift 5.9+
 
 ### App Store
@@ -219,10 +219,10 @@ open PomodoroSense.xcodeproj
 Then in Xcode:
 
 1. Select the **PomodoroSense** scheme.
-2. Pick a destination (iOS Simulator, physical iPhone, or "My Mac").
-3. `⌘ + R` to build and run.
+2. Pick a destination (iOS Simulator, a physical iPhone, or "My Mac").
+3. Press `⌘ + R` to build and run.
 
-> **Note**: Mirror Mode uses the local network. On iOS, you'll be prompted for Local Network permission the first time you open Sync Settings.
+> **Note**: Mirror Mode uses the local network. On iOS, the first time you open Sync Settings you'll be asked for Local Network permission.
 
 ---
 
@@ -268,92 +268,92 @@ Then in Xcode:
 | Persistence | **UserDefaults** + **Keychain** (peer ID, pairing key) |
 | Testing | **Swift Testing** (`@Test`, `@Suite`, `#expect`) |
 
-**No external dependencies.** Zero pods, zero SPM packages. Everything ships with the SDK.
+**No external dependencies.** No pods and no SPM packages. Everything comes with the SDK.
 
 ---
 
 ## Architecture
 
-- **MVVM** with `@MainActor` ViewModels and pure SwiftUI views.
-- **Balance files**: every tuning number lives in `*Balance.swift` files (audio, score, quality, sync). Change one file, the whole app rebalances.
-- **Single source of truth**: `SessionStore` owns all persistent state (records, wallet, goals, reports). Everything else observes it.
-- **Testable predicates**: Live Activity and widget logic is split into pure functions (`LiveActivityFilter`, `WidgetCommandDecision`) tested independently of UI.
-- **P2P first**: Mirror Mode never touches a server. Key derivation, framing, connection lifecycle, and reconnection are all local.
-- **Graceful degradation**: every feature has a fallback path. Audio missing? Silent mode. Live Activities disabled? Widget still works. Connection lost? Local session continues.
+- **MVVM** with `@MainActor` ViewModels and plain SwiftUI views.
+- **Balance files.** Every tuning number lives in a `*Balance.swift` file (audio, score, quality, sync). Change one file and the whole app rebalances.
+- **A single source of truth.** `SessionStore` owns all persistent state (records, wallet, goals, reports), and everything else observes it.
+- **Testable predicates.** Live Activity and widget logic is split into pure functions (`LiveActivityFilter`, `WidgetCommandDecision`) that are tested without the UI.
+- **P2P first.** Mirror Mode never touches a server. Key derivation, framing, the connection lifecycle and reconnection all happen locally.
+- **Graceful degradation.** Every feature has a fallback. If audio is missing, it stays silent. If Live Activities are disabled, the widget still works. If the connection drops, the local session keeps running.
 
 ---
 
 ## Privacy
 
-- **No accounts, no sign-in.**
-- **No analytics, no telemetry, no crash reporting.**
+- **No accounts and no sign-in.**
+- **No analytics, telemetry or crash reporting.**
 - **No server.** Nothing leaves your devices.
-- **Mirror Mode is peer-to-peer**: data is transmitted directly between paired devices over your local network, encrypted with TLS-PSK.
+- **Mirror Mode is peer-to-peer.** Data goes straight between paired devices over your local network, encrypted with TLS-PSK.
 - **Pairing keys** are stored in the system Keychain and never leave the device.
-- **Session records** are stored locally in `UserDefaults` and (optionally) compacted monthly to keep the app lightweight.
+- **Session records** are stored locally in `UserDefaults` and, optionally, compacted monthly to keep the app light.
 
-The only network permissions the app requests are:
+The only network permission the app asks for is:
 
-- **Local Network** — required for Mirror Mode discovery via Bonjour.
+- **Local Network**, which Mirror Mode needs for Bonjour discovery.
 
 ---
 
 ## How PomodoroSense was built
 
-PomodoroSense was not built by a team. It was built by **one developer with a clear vision, a stack of AIs, and a group of friends who cared enough to give honest feedback.**
+A team didn't build PomodoroSense. **One developer with a clear idea, a handful of AIs and a group of friends who gave honest feedback did.**
 
-The vision came first. Every decision in this app — from the spring animations to the balance of the reward loop, from the color palettes per soundscape to the way the Dynamic Island behaves under stress — started as a single sentence in a conversation. The AIs helped turn those sentences into code. The friends helped turn that code into something that *feels* premium.
+The idea came first. Every decision in this app, from the spring animations to the balance of the reward loop, from the color palettes per soundscape to how the Dynamic Island behaves under pressure, started as a single sentence in a conversation. The AIs helped turn those sentences into code. The friends helped make that code feel good to use.
 
 ### The vision
 
-The author's primary language is **C#**. Swift, SwiftUI, ActivityKit, Network.framework, and the entire Apple ecosystem were new territory. The AIs were not a shortcut — they were a tutor, a translator, and a second pair of hands at the same time. Every pattern in this codebase (MVVM, `@MainActor`, property wrappers, phase management, Live Activity lifecycle) was learned while building.
+My main language is **C#**. Swift, SwiftUI, ActivityKit, Network.framework and the whole Apple ecosystem were new to me. The AIs weren't a shortcut. They were a tutor, a translator and a second pair of hands at the same time. Every pattern in this codebase (MVVM, `@MainActor`, property wrappers, phase management, the Live Activity lifecycle) I learned while building it.
 
-But the vision was never delegated. What the app should feel like, what the reward loop should reward, what a session should *taste* like after 25 minutes of focus — those were decisions made by the author, in dialogue with himself, and later validated by the people who actually use the app. The AIs wrote the syntax. The author wrote the intent.
+But I never handed off the vision. What the app should feel like, what the reward loop should reward, what a session should taste like after 25 minutes of focus: I decided those things, talking it through with myself, and the people who actually use the app validated them later. The AIs wrote the syntax. The intent was mine.
 
 ### The AI stack
 
-- **DeepSeek** — the central engine. Architecture, most of the Swift implementation, refactors, and the day-to-day dialogue. If PomodoroSense has a "brain," it lives here.
-- **Gemini** — planner and co-creator of the base. Visual design, color systems, structural decisions, and early review passes. The original skeleton of the app started as a Gemini conversation.
-- **Claude** — surgical fixes, bug hunting, and code review. Every fix shipped in this repository was validated by tests before being merged.
-- **ChatGPT** — images and visual assets. The rendered shop items, the icon compositions, and some of the screenshots in this README were generated with ChatGPT.
+- **DeepSeek** was the main engine. Architecture, most of the Swift implementation, refactors and the day-to-day back and forth. If PomodoroSense has a "brain", it's here.
+- **Gemini** was the planner and co-author of the base. Visual design, color systems, structural decisions and the early review passes. The first skeleton of the app came out of a Gemini conversation.
+- **Claude** handled surgical fixes, bug hunting and code review. Every fix that landed in this repository was validated with tests before it was merged.
+- **ChatGPT** made the images and visual assets: the rendered shop items, the icon compositions and some of the screenshots in this README.
 
-The human in the loop — the author — decided what to build, held the vision, tested on real devices, rejected broken code, and kept the AIs honest. Nothing was shipped without being run.
+The human in the loop, which is me, decided what to build, held the vision, tested on real devices, rejected broken code and kept the AIs honest. Nothing shipped without being run first.
 
 ### The friends
 
-An app that *works* is not the same as an app that *feels premium*. The gap between those two was closed by a small circle of friends who used early builds, complained about the right things, and celebrated the small wins with the same energy as the big ones.
+An app that *works* isn't the same as an app that *feels premium*. A small circle of friends closed that gap. They used early builds, complained about the right things, and celebrated the small wins as much as the big ones.
 
-They are the reason:
+Because of them:
 
-- The timer doesn't feel like a countdown — it feels like a companion.
-- The reward popup lands at the exact moment it should.
+- The timer feels like a companion, not a countdown.
+- The reward popup lands at exactly the right moment.
 - The shop previews rotate at the right speed.
-- The dynamic island doesn't flicker on a real device.
-- The balance between "challenging" and "rewarding" actually feels like a balance, not a spreadsheet.
-- The soundscapes are mixed at a volume you can live with for hours.
+- The Dynamic Island doesn't flicker on a real device.
+- The balance between challenging and rewarding feels like a balance, not a spreadsheet.
+- The soundscapes are mixed at a volume you can stand for hours.
 - The animations have a *feel*, not just a duration.
 
-Every piece of feedback — "esto se siente lento", "no entiendo para qué es esto", "me encanta cuando pasa X" — was written down, discussed, and translated into either a fix, a feature, or a deliberate decision to leave it alone. The friends did not write code. But the app would not exist in this form without them.
+I wrote down every piece of feedback ("esto se siente lento", "no entiendo para qué es esto", "me encanta cuando pasa X"), we talked it over, and it ended up as a fix, a feature, or a deliberate decision to leave things alone. The friends didn't write code. But the app wouldn't exist in this form without them.
 
-If you are one of those friends reading this: thank you. This app is as much yours as it is mine.
+If you're one of those friends reading this: thank you. This app is as much yours as it is mine.
 
 ### A note on cost
 
-This project was built on **free tiers**. Every model listed above was used through its free plan, with the single exception of Gemini, which was covered by a Google **student pack**. Total AI budget: zero. The real cost was time — and the return was a very steep learning curve compressed into a single project.
+I built this on free tiers. Every model listed above was used on its free plan, except Gemini, which was covered by a Google student pack. Total AI budget: zero. The real cost was time, and what I got back was a very steep learning curve packed into one project.
 
 ### A note on quality
 
-Vibe coding is not a shortcut. Every line of code in this repository was prompted, reviewed, iterated, and — crucially — executed. The 35+ unit tests, the tested predicates for Live Activities and widget commands, and the balance files that centralize every tuning number are not the result of pressing a button. They are the result of thousands of small decisions made in dialogue with a stack of AIs — and of a developer who refused to ship anything he didn't understand.
+Vibe coding isn't a shortcut. Every line in this repository was prompted, reviewed, iterated on and, above all, run. The 35+ unit tests, the tested predicates for Live Activities and widget commands, and the balance files that hold every tuning number didn't come from pressing a button. They came from thousands of small decisions made in conversation with several AIs, and from a developer who refused to ship anything he didn't understand.
 
-PomodoroSense is proof that a single developer with the right tools, a clear vision, and honest friends can build something that feels native, tested, and carefully tuned — without a team, without a budget, and without pretending to already know the language he was writing it in.
+PomodoroSense shows that one developer with the right tools, a clear idea and honest friends can build something that feels native, is tested and is carefully tuned, with no team, no budget and no pretending to already know the language he was writing in.
 
-If you are a C# developer wondering whether you can build for Apple platforms without a Swift background, this repository is the answer: yes, you can — as long as you are willing to read the docs, write the tests, learn the idioms one error at a time, and listen to the people who actually use what you build.
+If you're a C# developer wondering whether you can build for Apple platforms without a Swift background, this repository is the answer. You can, as long as you're willing to read the docs, write the tests, learn the idioms one error at a time and listen to the people who use what you build.
 
 ---
 
 ## Contributing
 
-Pull requests are welcome! For major changes, please open an issue first to discuss what you'd like to change.
+Pull requests are welcome. For major changes, please open an issue first so we can talk about what you'd like to change.
 
 ### Development guidelines
 
@@ -365,12 +365,12 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 
 ### Reporting bugs
 
-When opening an issue, please include:
+When you open an issue, please include:
 
 - Platform (iOS / macOS) and version.
 - Steps to reproduce.
-- What you expected vs. what happened.
-- Screenshots or screen recording if visual.
+- What you expected and what happened instead.
+- Screenshots or a screen recording if the problem is visual.
 
 ---
 
@@ -381,7 +381,7 @@ When opening an issue, please include:
 - GitHub: [@tomasagustinrossi](https://github.com/tomasagustinrossi)
 - 🇦🇷 Built in Argentina.
 
-PomodoroSense is a personal project. It is not a company, not a startup, and not a product. It is a tool I built because I wanted it to exist, and I am sharing it because it might be useful to someone else.
+PomodoroSense is a personal project. It's not a company, a startup or a product. It's a tool I built because I wanted it to exist, and I'm sharing it in case it's useful to someone else.
 
 ---
 
@@ -393,33 +393,33 @@ PomodoroSense is licensed under the **PolyForm Noncommercial License 1.0.0**.
 
 ### Why this license
 
-PolyForm Noncommercial is a modern source-available license designed specifically for software. Unlike Creative Commons licenses, it is unambiguous about code, patents, and linking, and it is enforceable in court. It was chosen because it is the cleanest way to express two things:
+PolyForm Noncommercial is a modern source-available license written specifically for software. Unlike Creative Commons licenses, it's explicit about code, patents and linking, and it can be enforced in court. I picked it because it says two things in the cleanest way:
 
-1. **You can read, run, learn from, and adapt this code.**
-2. **You cannot sell it, and you cannot publish it on the App Store.**
+1. **You can read, run, learn from and adapt this code.**
+2. **You can't sell it, and you can't publish it on the App Store.**
 
 ### What you can do
 
-- ✅ **Read and learn from the code** — every file, every comment, every test.
+- ✅ **Read and learn from the code**: every file, every comment, every test.
 - ✅ **Clone and run it locally** on your own devices.
-- ✅ **Fork it for personal use** — modify it, break it, fix it, rebuild it.
+- ✅ **Fork it for personal use**: modify it, break it, fix it, rebuild it.
 - ✅ **Share it with friends** who want to run it on their own devices.
 - ✅ **Contribute back** through pull requests.
-- ✅ **Use it in education, research, charity, or government** — those are explicitly noncommercial uses under PolyForm.
+- ✅ **Use it in education, research, charity or government.** PolyForm explicitly treats those as noncommercial uses.
 
 ### What you cannot do
 
-- ❌ **Sell PomodoroSense, or a derivative of it**, in any form.
-- ❌ **Publish it on the App Store, Mac App Store, Google Play, Microsoft Store, Steam, or any other commercial app distribution platform.** This applies even if you publish it for free — the restriction is about the platform, not the price.
+- ❌ **Sell PomodoroSense or a derivative of it**, in any form.
+- ❌ **Publish it on the App Store, Mac App Store, Google Play, Microsoft Store, Steam or any other commercial app distribution platform.** This applies even if you publish it for free, because the restriction is about the platform and not the price.
 - ❌ **Use the code in any commercial product or service.**
 - ❌ **Remove the copyright notice or the license file.**
 - ❌ **Sublicense or transfer your rights to someone else.**
 
-If you want to publish a product based on this work, you must obtain **prior written permission from the author** and publish it under a substantially different product identity.
+If you want to publish a product based on this work, you need **prior written permission from the author** and you must publish it under a substantially different product identity.
 
 ### Required notice
 
-Per the PolyForm license, any distribution of PomodoroSense or of a derivative work must include a copy of the license and the following notice:
+Under the PolyForm license, any distribution of PomodoroSense or of a derivative work must include a copy of the license and the following notice:
 
 > **PomodoroSense** — Copyright (c) 2026 Tomas Rossi.
 > Licensed under the PolyForm Noncommercial License 1.0.0.
@@ -427,17 +427,17 @@ Per the PolyForm license, any distribution of PomodoroSense or of a derivative w
 
 ### Full license text
 
-The full text of the PolyForm Noncommercial License 1.0.0 — including the additional App Store restriction added by the author — is in [LICENSE](LICENSE), and the canonical version is at [polyformproject.org/licenses/noncommercial/1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/).
+The full text of the PolyForm Noncommercial License 1.0.0, including the extra App Store restriction the author added, is in [LICENSE](LICENSE). The canonical version is at [polyformproject.org/licenses/noncommercial/1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/).
 
 ---
 
 ## Acknowledgments
 
 - Inspired by the original Pomodoro Technique by Francesco Cirillo.
-- Audio design borrows ideas from Paul Kellet's pink noise filter and the broader ambient audio community.
-- **Built with AI, for humans.** PomodoroSense is a vibe-coded project. DeepSeek, Gemini, Claude, and ChatGPT were not tools I used — they were the team I built it with. The full story is in [How PomodoroSense was built](#how-pomodorosense-was-built).
+- The audio design borrows ideas from Paul Kellet's pink noise filter and the wider ambient audio community.
+- **Built with AI, for humans.** PomodoroSense is a vibe-coded project. DeepSeek, Gemini, Claude and ChatGPT weren't just tools I used. They were the team I built it with. The full story is in [How PomodoroSense was built](#how-pomodorosense-was-built).
 - Built with love in Argentina.
 
 <p align="center">
-  <sub>Made with ❤️, a lot of focus sessions, and a stack of AIs.</sub>
+  <sub>Made with ❤️, a lot of focus sessions and a handful of AIs.</sub>
 </p>
