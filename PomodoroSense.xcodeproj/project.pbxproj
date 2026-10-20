@@ -63,6 +63,7 @@
 		668E84C630757D3900C0779F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		6691EF353079EA91002A5C65 /* PomodoroWidgetExtensionDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PomodoroWidgetExtensionDebug.entitlements; sourceTree = "<group>"; };
 		66E602F73087DD1500460288 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		66E602F93087E61E00460288 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -279,6 +280,7 @@
 				6654A60A307D9A6600E391C3 /* PomodoroWidgets */,
 				661B064E3072DF53000890AC /* Products */,
 				66E602F73087DD1500460288 /* LICENSE */,
+				66E602F93087E61E00460288 /* README.md */,
 			);
 			sourceTree = "<group>";
 		};
