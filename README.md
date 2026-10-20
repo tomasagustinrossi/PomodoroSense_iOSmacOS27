@@ -198,8 +198,8 @@ Most Pomodoro apps I tried were either too basic or too social. This is the one 
 
 ### Requirements
 
-- **iOS 17.0+** or **macOS 14.0+**
-- Xcode 16.0+ (to build from source)
+- **iOS 27.0+** or **macOS 27.0+**
+- Xcode 27.0+ (to build from source)
 - Swift 5.9+
 
 ### App Store
